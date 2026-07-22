@@ -11,7 +11,7 @@ const C = WK_COLORS
 function LoginInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const next = params.get('next') || '/account'
+  const next = params.get('next')
   const [mode, setMode] = useState<'login' | 'reset'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,7 +31,7 @@ function LoginInner() {
         setBusy(false)
         return
       }
-      router.push(next)
+      router.push(next || (profile.isAdmin ? '/itsadmin1' : '/account'))
     } catch (e) {
       setErr(authErrorMessage((e as { code?: string }).code || ''))
     }
@@ -74,7 +74,7 @@ function LoginInner() {
               </button>
             </p>
             <p style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}88`, marginTop: 6 }}>
-              ما عندك حساب؟ <a href={`/signup?next=${encodeURIComponent(next)}`} style={{ color: C.violet, fontWeight: 800 }}>سوّي حساب</a>
+              ما عندك حساب؟ <a href={`/signup?next=${encodeURIComponent(next || '/account')}`} style={{ color: C.violet, fontWeight: 800 }}>سوّي حساب</a>
             </p>
           </>
         ) : (
