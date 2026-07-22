@@ -14,7 +14,7 @@ import {
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
 import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN } from '@/lib/wala-kelma-content'
-import { useWalaKelmaCountdown, useResultSounds, PHASE_LABEL } from '@/components/shared'
+import { useWalaKelmaCountdown, useResultSounds, PHASE_LABEL, GradientBlobs } from '@/components/shared'
 import { ShareResultButton } from '@/components/share-result'
 import { Logo } from '@/components/logo'
 
@@ -62,8 +62,9 @@ export default function HostPage() {
   if (!room) return <Loading />
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px 14px 40px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 480, margin: '0 auto', padding: '16px 14px 40px' }}>
         {room.status === 'setup' && <SetupWizard room={room} />}
         {room.status === 'draw' && <DrawScreen room={room} />}
         {room.status === 'playing' && <ControlPanel room={room} timeLeft={timeLeft} />}
@@ -300,12 +301,16 @@ function DrawScreen({ room }: { room: WalaKelmaRoom }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center', paddingTop: 40, textAlign: 'center' }}>
       <div style={{ fontSize: 22, fontWeight: 800, color: `${C.ink}aa` }}>القرعة 🎲</div>
-      <div>
-        <div style={{ fontSize: 16, color: `${C.ink}88` }}>الفريق البادئ</div>
-        <div style={{ fontSize: 40, fontWeight: 900, color }}>{room.teams[room.activeTeam].name}</div>
+      <div style={{
+        width: '100%', maxWidth: 320, borderRadius: 22, padding: '24px 22px',
+        background: `linear-gradient(135deg, ${color}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
+        color: '#fff', boxShadow: `0 16px 40px ${color}33`,
+      }}>
+        <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>الفريق البادئ</div>
+        <div style={{ fontSize: 36, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
+        {slot && <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
       </div>
-      {slot && <div style={{ fontSize: 22, fontWeight: 700 }}>أول لاعب: {slot.playerName}</div>}
-      <button onClick={() => beginPlaying(room.code)} style={{ ...primaryBtn, maxWidth: 280 }}>يلا نبدأ ←</button>
+      <button onClick={() => beginPlaying(room.code)} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, maxWidth: 280 }}>يلا نبدأ ←</button>
     </div>
   )
 }
@@ -343,7 +348,11 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
       <div style={{ display: 'flex', gap: 10 }}>
         {(['A', 'B'] as TeamId[]).map(id => (
-          <div key={id} style={{ flex: 1, textAlign: 'center', padding: 10, borderRadius: 16, border: `2px solid ${room.activeTeam === id ? (id === 'A' ? C.violet : C.red) : `${C.ink}12`}`, background: '#fff' }}>
+          <div key={id} style={{
+            flex: 1, textAlign: 'center', padding: 10, borderRadius: 16,
+            border: `2px solid ${room.activeTeam === id ? (id === 'A' ? C.violet : C.red) : `${C.ink}12`}`, background: '#fff',
+            boxShadow: room.activeTeam === id ? `0 10px 26px ${(id === 'A' ? C.violet : C.red)}22` : `0 6px 16px ${C.ink}08`,
+          }}>
             <div style={{ fontSize: 13, fontWeight: 800 }}>{room.teams[id].name}</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 4 }}>
               <button onClick={() => adjustScore(room.code, id, -1)} style={miniBtn}>−</button>
@@ -510,20 +519,20 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
       <div style={{ fontSize: 30, fontWeight: 900, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>{win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}</div>
       <div style={{ display: 'flex', gap: 12, width: '100%' }}>
         {(['A', 'B'] as TeamId[]).map(id => (
-          <div key={id} style={{ flex: 1, padding: 16, borderRadius: 16, background: '#fff', border: `1px solid ${C.ink}12` }}>
+          <div key={id} style={{ flex: 1, padding: 16, borderRadius: 16, background: '#fff', border: `1px solid ${(id === 'A' ? C.violet : C.red)}2a`, boxShadow: `0 10px 26px ${(id === 'A' ? C.violet : C.red)}1c` }}>
             <div style={{ fontSize: 14, fontWeight: 800 }}>{room.teams[id].name}</div>
             <div style={{ fontSize: 36, fontWeight: 900, color: id === 'A' ? C.violet : C.red }}>{room.teams[id].score}</div>
           </div>
         ))}
       </div>
       {bestActor && (
-        <div style={{ background: `${C.orange}14`, borderRadius: 14, padding: '10px 20px' }}>
+        <div style={{ background: `${C.orange}14`, borderRadius: 14, padding: '10px 20px', border: `1px solid ${C.orange}22`, boxShadow: `0 8px 20px ${C.orange}1c` }}>
           <span style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>🎭 أفضل ممثل: </span>
           <span style={{ fontSize: 16, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
         </div>
       )}
       <ShareResultButton room={room} refUid={room.hostId} />
-      <button onClick={onNew} style={{ ...primaryBtn, maxWidth: 280 }}>🎭 مباراة جديدة</button>
+      <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, maxWidth: 280 }}>🎭 مباراة جديدة</button>
     </div>
   )
 }
@@ -553,7 +562,7 @@ function Header({ title }: { title: string }) {
     <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 6 }}>{title}</div>
   </div>
 }
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) { return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, ...style }}>{children}</div> }
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) { return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, ...style }}>{children}</div> }
 function SectionTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) { return <p style={{ fontSize: 12, fontWeight: 900, color: `${C.ink}77`, marginBottom: 8, ...style }}>{children}</p> }
 function Muted({ children }: { children: React.ReactNode }) { return <p style={{ fontSize: 12, color: `${C.ink}88` }}>{children}</p> }
 function ErrorText({ children }: { children: React.ReactNode }) { return <p style={{ fontSize: 13, fontWeight: 700, color: C.red, textAlign: 'center' }}>{children}</p> }
@@ -562,9 +571,9 @@ function Input({ value, onChange, placeholder, accent }: { value: string; onChan
 }
 
 const inputStyle = (accent?: string): React.CSSProperties => ({ width: '100%', padding: '11px 12px', borderRadius: 12, border: `1px solid ${accent ? accent + '55' : C.ink + '20'}`, fontSize: 14, color: C.ink, background: C.cream, outline: 'none', marginBottom: 8 })
-const primaryBtn: React.CSSProperties = { width: '100%', padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 16, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer' }
-const successBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: '#27AE78', cursor: 'pointer' }
-const dangerBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: C.red, cursor: 'pointer' }
+const primaryBtn: React.CSSProperties = { width: '100%', padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 16, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
+const successBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: '#27AE78', cursor: 'pointer', boxShadow: '0 10px 24px #27AE7833' }
+const dangerBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: C.red, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
 const ghostBtn: React.CSSProperties = { padding: '9px 12px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13, cursor: 'pointer' }
 const iconBtn: React.CSSProperties = { width: 40, borderRadius: 12, border: `1px solid ${C.ink}20`, background: '#fff', fontWeight: 900, fontSize: 18, cursor: 'pointer' }
 const miniBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 9, border: `1px solid ${C.ink}20`, background: C.cream, fontWeight: 900, fontSize: 16, cursor: 'pointer', color: C.ink }

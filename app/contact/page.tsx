@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { getContactSettings, type ContactSettings } from '@/lib/contact'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -20,8 +21,9 @@ export default function ContactPage() {
   useEffect(() => { getContactSettings().then(setS) }, [])
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 18px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 560, margin: '0 auto', padding: '24px 18px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.red }}>ولا كلمة</div>
           <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
@@ -36,9 +38,10 @@ export default function ContactPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {ROWS.filter(r => s[r.key]?.trim()).map(r => (
               <a key={r.key} href={r.href(s[r.key])} target="_blank" rel="noopener noreferrer"
+                className="transition-transform hover:scale-[1.01] active:scale-[0.99]"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 16,
-                  padding: '14px 16px', border: `1px solid ${C.ink}12`, textDecoration: 'none', color: C.ink,
+                  padding: '14px 16px', border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, textDecoration: 'none', color: C.ink,
                 }}>
                 <span style={{ fontSize: 22 }}>{r.icon}</span>
                 <div>

@@ -11,6 +11,7 @@ import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/com
 import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/itsadmin1/business-tabs'
 import { Logo } from '@/components/logo'
 import { onAuthChange, signIn, signOutUser, getUserProfile, authErrorMessage } from '@/lib/auth'
+import { GradientBlobs } from '@/components/shared'
 
 type GateState = 'checking' | 'signedOut' | 'denied' | 'granted'
 
@@ -44,8 +45,9 @@ export default function AdminPage() {
   if (gate === 'checking') return null
 
   if (gate === 'signedOut') {
-    return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
+    return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, boxShadow: `0 20px 50px ${C.ink}14`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center' }}><Logo height={54} /></div>
         <div style={{ fontSize: 15, fontWeight: 800, marginTop: 8, marginBottom: 16 }}>دخول لوحة الإدارة</div>
         <input value={email} onChange={e => setEmail(e.target.value)} placeholder="الإيميل" type="email"
@@ -60,8 +62,9 @@ export default function AdminPage() {
   }
 
   if (gate === 'denied') {
-    return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
+    return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, boxShadow: `0 20px 50px ${C.ink}14`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
         <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>حسابك ما عنده صلاحية دخول لوحة الإدارة</div>
         <button onClick={() => signOutUser()} style={ghostBtn}>تسجيل خروج</button>
@@ -70,8 +73,9 @@ export default function AdminPage() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 14px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 720, margin: '0 auto', padding: '16px 14px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Logo height={28} />
@@ -83,7 +87,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, marginBottom: 16, flexWrap: 'wrap' }}>
           {([
             ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['import', 'استيراد CSV'],
             ['orders', 'الطلبات'], ['users', 'المستخدمون'], ['packages', 'الباقات'], ['coupons', 'الكوبونات'], ['settings', 'الإعدادات'],

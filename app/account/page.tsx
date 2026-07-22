@@ -7,6 +7,7 @@ import { clearSeenWorks, type Difficulty } from '@/lib/works'
 import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, type CustomWork } from '@/lib/custom-works'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -35,8 +36,9 @@ export default function AccountPage() {
   const noBalance = profile.gamesBalance <= 0 && profile.freeGameUsed
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <Logo height={30} />
           <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
@@ -47,22 +49,24 @@ export default function AccountPage() {
           <div style={{ fontSize: 13, color: `${C.ink}88` }}>{profile.email}</div>
         </Card>
 
-        <Card style={{ textAlign: 'center', marginTop: 12 }}>
+        <div style={{ textAlign: 'center', marginTop: 12, borderRadius: 20, padding: 20, background: '#fff', border: `1px solid ${C.violet}22`, boxShadow: `0 14px 34px ${C.violet}1c` }}>
           <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>رصيدك من الألعاب</div>
           <div style={{ fontSize: 48, fontWeight: 900, color: C.violet, margin: '6px 0' }}>{profile.gamesBalance}</div>
           {!profile.freeGameUsed && <div style={{ fontSize: 13, color: '#27AE78', fontWeight: 800 }}>🎁 عندك لعبة مجانية أول مرة</div>}
           {noBalance && <div style={{ fontSize: 13, color: C.red, fontWeight: 800 }}>ما عندك رصيد — اشترِ باقة عشان تلعب</div>}
-          <a href="/packages" style={{ display: 'block', marginTop: 12, padding: 13, borderRadius: 12, color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, textDecoration: 'none' }}>
+          <a href="/packages" className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
+            style={{ display: 'block', marginTop: 12, padding: 13, borderRadius: 12, color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, textDecoration: 'none', boxShadow: `0 10px 24px ${C.red}33` }}>
             💳 اشترِ باقة
           </a>
-        </Card>
+        </div>
 
         <Card style={{ marginTop: 12 }}>
           <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>إجمالي المباريات</div>
           <div style={{ fontSize: 24, fontWeight: 900 }}>{profile.totalGamesPlayed || 0}</div>
         </Card>
 
-        <a href="/groups" style={{ display: 'block', marginTop: 12, padding: 14, borderRadius: 16, background: '#fff', border: `1px solid ${C.ink}12`, textDecoration: 'none', color: C.ink, fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
+        <a href="/groups" className="transition-transform hover:scale-[1.01] active:scale-[0.99]"
+          style={{ display: 'block', marginTop: 12, padding: 14, borderRadius: 16, background: '#fff', border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, textDecoration: 'none', color: C.ink, fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
           🏆 لوحات الصدارة مع الأصدقاء
         </a>
 
@@ -147,5 +151,5 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
 }
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, ...style }}>{children}</div>
+  return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, ...style }}>{children}</div>
 }

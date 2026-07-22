@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, resetPassword, authErrorMessage, signOutUser } from '@/lib/auth'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -52,8 +53,9 @@ function LoginInner() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 22, padding: 28, border: `1px solid ${C.ink}12` }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: '#fff', borderRadius: 22, padding: 28, border: `1px solid ${C.ink}12`, boxShadow: `0 20px 50px ${C.ink}14` }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'center' }}><Logo height={54} /></div>
           <div style={{ fontSize: 14, color: `${C.ink}88`, marginTop: 6 }}>{mode === 'login' ? 'تسجيل الدخول' : 'استرجاع كلمة المرور'}</div>
@@ -113,7 +115,7 @@ function LoginInner() {
 }
 
 const input: React.CSSProperties = { width: '100%', padding: '13px 14px', borderRadius: 12, border: `1px solid ${C.ink}20`, fontSize: 15, color: C.ink, background: C.cream, outline: 'none', marginBottom: 10 }
-const primaryBtn: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 12, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer' }
+const primaryBtn: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 12, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
 
 export default function LoginPage() {
   return <Suspense fallback={null}><LoginInner /></Suspense>

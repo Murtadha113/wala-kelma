@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { onAuthChange, getUserProfile, type UserProfile } from '@/lib/auth'
 import { createGroup, joinGroupByCode, getUserGroups, type FriendGroup } from '@/lib/friend-groups'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -51,19 +52,20 @@ export default function GroupsPage() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div style={{ fontSize: 24, fontWeight: 900, color: C.red }}>لوحات الصدارة</div>
           <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← حسابي</a>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <div style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 12, border: `1px solid ${C.ink}12` }}>
+          <div style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 12, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a` }}>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="اسم مجموعة جديدة" style={miniInput} />
             <button onClick={create} disabled={busy} style={miniBtn}>+ إنشاء</button>
           </div>
-          <div style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 12, border: `1px solid ${C.ink}12` }}>
+          <div style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 12, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a` }}>
             <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="كود الدعوة" style={miniInput} />
             <button onClick={join} disabled={busy} style={miniBtn}>انضمام</button>
           </div>
@@ -71,13 +73,13 @@ export default function GroupsPage() {
         {err && <p style={{ color: C.red, fontSize: 13, fontWeight: 700, textAlign: 'center', marginBottom: 12 }}>{err}</p>}
 
         {groups.length === 0 && (
-          <div style={{ background: '#fff', borderRadius: 18, padding: 20, textAlign: 'center', border: `1px solid ${C.ink}12` }}>
+          <div style={{ background: '#fff', borderRadius: 18, padding: 20, textAlign: 'center', border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a` }}>
             <p style={{ color: `${C.ink}88`, fontSize: 13 }}>ما انضممت لأي مجموعة بعد — سوّي وحدة أو انضم بكود صديق.</p>
           </div>
         )}
 
         {groups.map(g => (
-          <div key={g.id} style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, marginBottom: 12 }}>
+          <div key={g.id} style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 16, fontWeight: 900 }}>{g.name}</div>
               <div style={{ fontSize: 12, color: `${C.ink}66`, background: C.cream, padding: '4px 10px', borderRadius: 999, fontWeight: 700 }}>كود: {g.inviteCode}</div>

@@ -11,6 +11,22 @@ import { playCorrectSound, playWrongSound, playWinSound, playTickSound } from '@
 
 const C = WK_COLORS
 
+// خلفية متدرجة بألوان الهوية (بقع ضبابية) — تُستخدم بكل صفحات التطبيق لهوية بصرية موحّدة
+export function GradientBlobs() {
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }} aria-hidden>
+      <div style={{ position: 'absolute', top: -140, right: -100, width: 380, height: 380, borderRadius: '50%', background: `${C.orange}22`, filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', top: 200, left: -120, width: 320, height: 320, borderRadius: '50%', background: `${C.violet}1c`, filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', bottom: -100, right: '30%', width: 260, height: 260, borderRadius: '50%', background: `${C.red}14`, filter: 'blur(60px)' }} />
+    </div>
+  )
+}
+
+// كارت بظل ناعم بلون الفريق/الحالة — بديل موحّد للكارت الأبيض المسطّح
+export function glowCard(color: string = C.ink, opacity = '14'): React.CSSProperties {
+  return { background: '#fff', borderRadius: 20, border: `1px solid ${color}22`, boxShadow: `0 10px 28px ${color}${opacity}` }
+}
+
 // العدّاد: يحسب المتبقي، والمقدم فقط يطلق التحولات (isHost)
 export function useWalaKelmaCountdown(room: WalaKelmaRoom | null, isHost: boolean, muted = false) {
   const [timeLeft, setTimeLeft] = useState(0)
@@ -107,6 +123,7 @@ export function ScoreBoard({ room, size = 'md' }: { room: WalaKelmaRoom; size?: 
         flex: 1, textAlign: 'center', padding: size === 'lg' ? '18px 12px' : '12px 8px',
         borderRadius: 20, border: `2px solid ${active ? color : 'rgba(0,0,0,0.08)'}`,
         background: active ? `${color}18` : 'rgba(255,255,255,0.6)', transition: 'all 0.3s',
+        boxShadow: active ? `0 10px 26px ${color}22` : 'none',
       }}>
         <div style={{ fontSize: label, fontWeight: 800, color: C.ink, marginBottom: 4 }}>{room.teams[id].name}</div>
         <div style={{ fontSize: font, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{room.teams[id].score}</div>

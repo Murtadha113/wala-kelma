@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { onAuthChange } from '@/lib/auth'
 import { getActivePackages, type Package } from '@/lib/packages'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -22,8 +23,9 @@ export default function PackagesPage() {
   }, [router])
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 26, fontWeight: 900, color: C.red }}>الباقات</div>
           <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← حسابي</a>
@@ -39,9 +41,11 @@ export default function PackagesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {pkgs.map(p => (
             <div key={p.id} onClick={() => router.push(`/packages/pay?packageId=${p.id}`)}
+              className="transition-transform hover:scale-[1.01] active:scale-[0.99]"
               style={{
                 cursor: 'pointer', position: 'relative', background: '#fff', borderRadius: 18, padding: 18,
                 border: `2px solid ${p.isFeatured ? C.orange : `${C.ink}12`}`,
+                boxShadow: p.isFeatured ? `0 14px 34px ${C.orange}22` : `0 8px 22px ${C.ink}0a`,
               }}>
               {p.isFeatured && (
                 <div style={{ position: 'absolute', top: -10, right: 16, background: C.orange, color: '#fff', fontSize: 11, fontWeight: 900, padding: '3px 10px', borderRadius: 999 }}>

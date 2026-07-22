@@ -7,6 +7,7 @@ import { getPackage, type Package } from '@/lib/packages'
 import { getPaymentSettings, submitOrder, type PaymentSettings } from '@/lib/payments'
 import { findAndValidateCoupon, computeDiscount, type Coupon } from '@/lib/coupons'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { GradientBlobs } from '@/components/shared'
 
 const C = WK_COLORS
 
@@ -98,8 +99,9 @@ function PayInner() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink }}>
-      <div style={{ maxWidth: 400, margin: '0 auto', padding: '20px 16px 60px' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative', maxWidth: 400, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.red }}>الدفع</div>
           <a href="/packages" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الباقات</a>
@@ -181,7 +183,7 @@ function PayInner() {
 }
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, ...style }}>{children}</div>
+  return <div style={{ background: '#fff', borderRadius: 18, padding: 16, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, ...style }}>{children}</div>
 }
 function Center({ children }: { children: React.ReactNode }) {
   return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>{children}</div>

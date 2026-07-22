@@ -8,7 +8,7 @@ import { CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@/lib/custom-works'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import {
   useWalaKelmaCountdown, useResultSounds, phaseTotal, PHASE_LABEL,
-  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen,
+  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs,
 } from '@/components/shared'
 import { Logo } from '@/components/logo'
 
@@ -147,7 +147,7 @@ function DisplayInner() {
       </div>
       <div style={{ marginTop: 28, width: 360, maxWidth: '86vw' }}><ScoreBoard room={room} size="lg" /></div>
       {bestActor && (
-        <div style={{ marginTop: 20, display: 'inline-block', background: `${C.orange}14`, borderRadius: 14, padding: '10px 24px' }}>
+        <div style={{ marginTop: 20, display: 'inline-block', background: `${C.orange}14`, borderRadius: 14, padding: '10px 24px', border: `1px solid ${C.orange}22`, boxShadow: `0 10px 26px ${C.orange}1c` }}>
           <span style={{ fontSize: 15, color: `${C.ink}88`, fontWeight: 700 }}>🎭 أفضل ممثل: </span>
           <span style={{ fontSize: 20, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
         </div>
@@ -162,7 +162,8 @@ function DisplayInner() {
   const categoryName = (id: string) => id === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : (cats.find(c => c.id === id)?.name || '')
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)' }}>
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)', position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
       <div style={{ position: 'fixed', top: 10, left: 10, display: 'flex', gap: 6, zIndex: 30 }}>
         <button onClick={() => setMuted(m => !m)} title={muted ? 'تشغيل الصوت' : 'كتم الصوت'}
           style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.ink}18`, background: '#fff', cursor: 'pointer', fontSize: 15 }}>
@@ -210,7 +211,7 @@ function DisplayInner() {
               {room.lastResult.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
             </div>
             {room.currentWork && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 18, padding: 14, border: `1px solid ${C.ink}12` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 18, padding: 14, border: `1px solid ${C.ink}12`, boxShadow: `0 12px 30px ${C.ink}12` }}>
                 {room.currentWork.posterUrl && <img src={room.currentWork.posterUrl} alt="" width={64} style={{ borderRadius: 10, objectFit: 'cover' }} />}
                 <div>
                   <div style={{ fontSize: 12, color: `${C.ink}77`, fontWeight: 700 }}>الإجابة الصحيحة</div>
@@ -242,7 +243,12 @@ function DisplayInner() {
 }
 
 function Center({ children }: { children: React.ReactNode }) {
-  return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>{children}</div>
+  return (
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      <GradientBlobs />
+      <div style={{ position: 'relative' }}>{children}</div>
+    </div>
+  )
 }
 
 export default function DisplayPage() {
