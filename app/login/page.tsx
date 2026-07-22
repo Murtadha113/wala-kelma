@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signIn, resetPassword, authErrorMessage } from '@/lib/auth'
+import { signIn, resetPassword, authErrorMessage, signOutUser } from '@/lib/auth'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 
@@ -24,7 +24,13 @@ function LoginInner() {
     if (!email.trim() || !password) { setErr('عبّي الإيميل وكلمة المرور'); return }
     setBusy(true)
     try {
-      await signIn(email.trim(), password)
+      const profile = await signIn(email.trim(), password)
+      if (profile.isBlocked) {
+        await signOutUser()
+        setErr('حسابك محظور — تواصل مع الدعم')
+        setBusy(false)
+        return
+      }
       router.push(next)
     } catch (e) {
       setErr(authErrorMessage((e as { code?: string }).code || ''))

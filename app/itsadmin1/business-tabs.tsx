@@ -155,7 +155,7 @@ export function UsersTab() {
 
   const filtered = users
     .filter(u => filter === 'all' || isSubscriber(u))
-    .filter(u => !search.trim() || u.name.includes(search) || u.email.includes(search))
+    .filter(u => !search.trim() || (u.name || '').includes(search) || (u.email || '').includes(search))
 
   const subscriberCount = users.filter(isSubscriber).length
 
