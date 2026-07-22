@@ -247,9 +247,9 @@ function CategoryCard({ name, imageUrl, selected, onClick }: { name: string; ima
       transition: 'all 0.15s',
     }}>
       {imageUrl ? (
-        <img src={imageUrl} alt={name} width={48} height={48} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }} />
+        <img src={imageUrl} alt={name} width={72} height={72} style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover' }} />
       ) : (
-        <div style={{ width: 48, height: 48, borderRadius: 10, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🎭</div>
+        <div style={{ width: 72, height: 72, borderRadius: 12, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🎭</div>
       )}
       <span style={{ fontSize: 11.5, fontWeight: 800, color: selected ? C.red : `${C.ink}99`, textAlign: 'center', lineHeight: 1.3 }}>{name}</span>
     </button>
