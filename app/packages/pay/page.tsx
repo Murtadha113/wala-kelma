@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { onAuthChange } from '@/lib/auth'
 import { getPackage, type Package } from '@/lib/packages'
 import { getPaymentSettings, submitOrder, type PaymentSettings } from '@/lib/payments'
+import { findAndValidateCoupon, computeDiscount, type Coupon } from '@/lib/coupons'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 
 const C = WK_COLORS
@@ -19,9 +20,27 @@ function PayInner() {
   const [copied, setCopied] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [coupon, setCoupon] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
+  const [couponChecking, setCouponChecking] = useState(false)
+  const [couponErr, setCouponErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [result, setResult] = useState<{ autoApproved: boolean } | null>(null)
+
+  const discount = appliedCoupon ? computeDiscount(appliedCoupon, pkg?.price || 0) : 0
+  const bonusGames = appliedCoupon?.type === 'free_games' ? appliedCoupon.value : 0
+  const finalAmount = Math.max(0, (pkg?.price || 0) - discount)
+
+  const checkCoupon = async () => {
+    setCouponErr(''); setAppliedCoupon(null)
+    if (!coupon.trim() || !uid || !pkg) return
+    setCouponChecking(true)
+    const res = await findAndValidateCoupon(coupon, uid, pkg.id)
+    setCouponChecking(false)
+    if (!res.valid) { setCouponErr(res.error); return }
+    setAppliedCoupon(res.coupon)
+  }
+  const removeCoupon = () => { setAppliedCoupon(null); setCoupon(''); setCouponErr('') }
 
   useEffect(() => {
     return onAuthChange(user => {
@@ -41,7 +60,7 @@ function PayInner() {
     if (!uid || !pkg) return
     if (!file) { setErr('ارفع صورة الإيصال'); return }
     setBusy(true)
-    const res = await submitOrder({ userId: uid, packageId: pkg.id, receiptFile: file, couponCode: coupon || undefined })
+    const res = await submitOrder({ userId: uid, packageId: pkg.id, receiptFile: file, couponCode: appliedCoupon?.code })
     setBusy(false)
     if (!res.success) { setErr(res.error); return }
     setResult({ autoApproved: res.autoApproved })
@@ -82,14 +101,46 @@ function PayInner() {
 
         <Card>
           <div style={{ fontSize: 16, fontWeight: 900 }}>{pkg.nameAr}</div>
-          <div style={{ fontSize: 13, color: `${C.ink}88` }}>{pkg.gamesCount} لعبة</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: C.red, marginTop: 6 }}>{pkg.price.toFixed(3)} <span style={{ fontSize: 13 }}>د.ب</span></div>
+          <div style={{ fontSize: 13, color: `${C.ink}88` }}>{pkg.gamesCount + bonusGames} لعبة{bonusGames > 0 && ` (${pkg.gamesCount} + ${bonusGames} هدية)`}</div>
+          {discount > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: 15, color: `${C.ink}55`, textDecoration: 'line-through' }}>{pkg.price.toFixed(3)}</span>
+              <span style={{ fontSize: 26, fontWeight: 900, color: '#27AE78' }}>{finalAmount.toFixed(3)} <span style={{ fontSize: 13 }}>د.ب</span></span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 26, fontWeight: 900, color: C.red, marginTop: 6 }}>{pkg.price.toFixed(3)} <span style={{ fontSize: 13 }}>د.ب</span></div>
+          )}
+        </Card>
+
+        <Card style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginBottom: 8 }}>كود خصم (اختياري)</div>
+          {appliedCoupon ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#27AE7814', borderRadius: 10, padding: 10 }}>
+              <span style={{ fontWeight: 800, color: '#27AE78', fontSize: 13 }}>✓ {appliedCoupon.code} مُطبّق</span>
+              <button onClick={removeCoupon} style={{ background: 'none', border: 'none', color: C.red, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>إزالة</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} placeholder="مثلاً: RAMADAN25"
+                onKeyDown={e => e.key === 'Enter' && checkCoupon()}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 14, outline: 'none' }} />
+              <button onClick={checkCoupon} disabled={!coupon.trim() || couponChecking}
+                style={{ padding: '0 16px', borderRadius: 10, border: 'none', background: C.violet, color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', opacity: !coupon.trim() || couponChecking ? 0.5 : 1 }}>
+                {couponChecking ? '…' : 'تحقّق'}
+              </button>
+            </div>
+          )}
+          {couponErr && <p style={{ color: C.red, fontSize: 12, fontWeight: 700, marginTop: 6 }}>{couponErr}</p>}
         </Card>
 
         <Card style={{ marginTop: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginBottom: 8 }}>حوّل المبلغ عبر بنفت</div>
           {settings.benefitNumber ? (
             <>
+              <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: `${C.ink}66` }}>المبلغ المطلوب تحويله</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: discount > 0 ? '#27AE78' : C.red }}>{finalAmount.toFixed(3)} د.ب</div>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: C.cream, borderRadius: 12, padding: 12 }}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '0.05em' }}>{settings.benefitNumber}</div>
@@ -110,12 +161,6 @@ function PayInner() {
             {file ? `📎 ${file.name}` : '📤 اختر صورة الإيصال'}
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
           </label>
-        </Card>
-
-        <Card style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginBottom: 8 }}>كود خصم (اختياري)</div>
-          <input value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} placeholder="مثلاً: RAMADAN25"
-            style={{ width: '100%', padding: 12, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 14, outline: 'none' }} />
         </Card>
 
         {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, textAlign: 'center', marginTop: 10 }}>{err}</p>}
