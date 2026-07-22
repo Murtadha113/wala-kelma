@@ -1,0 +1,107 @@
+// قواعد أمان Firestore لمشروع "ولا كلمة"
+//
+// ⚠️ لا تُنشر تلقائياً — انسخها يدوياً إلى Firebase Console → Firestore Database → Rules → Publish
+// (نفس الطريقة اللي استخدمناها وقت إعداد المشروع أول مرة).
+//
+// ⚠️ شرط مهم قبل النشر: لوحة الأدمن (/admin) تدخل حالياً بكلمة مرور فقط (بدون تسجيل Firebase Auth)،
+// بينما هذي القواعد تشترط على عمليات الكتابة الإدارية إن يكون عندك حساب مسجّل دخول
+// (بنفس تسجيل الدخول العادي في /login) وعليه isAdmin:true. قبل ما تنشر هذي القواعد:
+//   1) سجّل حساب عادي لنفسك من /signup (أو /login لو عندك).
+//   2) افتح Firebase Console → Firestore Database → Data → users/{uid الخاص فيك} → أضف حقل isAdmin (boolean) = true.
+//   3) تأكد إنك مسجّل دخول بنفس المتصفح وقت ما تستخدم /admin.
+// لو ما سويت هالخطوتين، عمليات الكتابة بلوحة الأدمن (إضافة أعمال، فئات، باقات...) بتفشل بعد نشر القواعد.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // ── حسابات المستخدمين ──
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid);
+      // المستخدم يقدر يعدّل بياناته الأساسية بس، مو الحقول المالية (isAdmin وحده يقدر)
+      allow update: if isSelf(uid) || isAdmin();
+      allow delete: if isSelf(uid) || isAdmin();
+
+      match /players/{playerName} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow write: if isSelf(uid);
+      }
+    }
+
+    // ── منع تكرار المحتوى (خاص بكل مستخدم) ──
+    match /seenWorks/{uid}/works/{workId} {
+      allow read, write: if isSelf(uid);
+    }
+
+    // ── الفئات المخصصة (خاصة بكل مستخدم) ──
+    match /customWorks/{uid}/works/{workId} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isSelf(uid);
+    }
+
+    // ── المحتوى العام (الفئات والأعمال) — قراءة للجميع، كتابة للأدمن فقط ──
+    match /walaKelmaCategories/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /walaKelmaWorks/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── الباقات — قراءة للجميع، كتابة للأدمن ──
+    match /packages/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── الطلبات — المستخدم ينشئ طلبه فقط، القراءة/التعديل للأدمن أو صاحب الطلب ──
+    match /orders/{id} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
+    // ── الكوبونات — قراءة عامة (نحتاجها وقت التحقق بصفحة الدفع)، كتابة للأدمن ──
+    match /coupons/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /couponRedemptions/{id} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+
+    // ── الإعدادات العامة — قراءة للجميع، كتابة للأدمن ──
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── لوحات الصدارة بين الأصدقاء ──
+    match /friendGroups/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();   // الانضمام/تحديث النقاط يصير من أي عضو موجود بالمجموعة
+    }
+
+    // ── سجلات (يكتبها التطبيق تلقائياً، يقرأها الأدمن فقط) ──
+    match /emailLogs/{id} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+    match /auditLogs/{id} {
+      allow create: if true;   // الأدمن يكتب هذي بدون تسجيل دخول Firebase (بوابة الباسكود الحالية)
+      allow read: if isAdmin();
+    }
+  }
+}

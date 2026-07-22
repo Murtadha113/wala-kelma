@@ -1,0 +1,38 @@
+// قواعد أمان Firebase Storage لمشروع "ولا كلمة"
+//
+// ⚠️ لا تُنشر تلقائياً — انسخها يدوياً إلى Firebase Console → Storage → Rules → Publish
+// نفس شرط firestore.rules: عمليات رفع محتوى الأدمن (فئات/أعمال) تحتاج حساب مسجّل دخول
+// وعليه isAdmin:true بوثيقة users/{uid} — راجع تعليمات الإعداد بـ firestore.rules.
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return isSignedIn() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isImage() {
+      return request.resource.contentType.matches('image/.*') && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    // صور الفئات والأعمال — يرفعها الأدمن فقط، يقرأها الجميع
+    match /categories/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage();
+    }
+    match /works/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage();
+    }
+
+    // إيصالات الدفع — كل مستخدم يرفع/يقرأ إيصالاته فقط، والأدمن يقرأ الكل
+    match /receipts/{uid}/{fileName} {
+      allow write: if isSelf(uid) && isImage();
+      allow read: if isSelf(uid) || isAdmin();
+    }
+  }
+}

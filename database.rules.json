@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "wala_kelma_rooms": {
+      "$code": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}
