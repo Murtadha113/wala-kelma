@@ -1,6 +1,6 @@
 // تهيئة Firebase لمشروع "ولا كلمة" المستقل — Firestore (المحتوى) + Realtime Database (تزامن الغرف)
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 import { getDatabase } from 'firebase/database'
 import { getAuth } from 'firebase/auth'
 
@@ -16,7 +16,18 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 
-export const db = getFirestore(app)     // Firestore — الأعمال والفئات
+// كاش محلي (IndexedDB) للفئات/الأعمال — يخلي القراءات المتكررة فورية بدل انتظار رحلة الشبكة كل مرة
+// (خادم Firestore بعيد جغرافياً عن مستخدمينا، فكل قراءة كانت تاخذ 400-1500ms)
+function makeFirestore() {
+  if (typeof window === 'undefined') return getFirestore(app)
+  try {
+    return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+  } catch {
+    return getFirestore(app) // مُهيّأ مسبقاً (مثلاً بعد Fast Refresh) — نرجع لنفس النسخة
+  }
+}
+
+export const db = makeFirestore()       // Firestore — الأعمال والفئات
 export const rtdb = getDatabase(app)    // Realtime Database — غرف المباريات
 export const auth = getAuth(app)
 export default app
