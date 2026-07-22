@@ -89,9 +89,11 @@ export async function submitOrder(params: {
     const todayCount = todaySnap.docs.filter(d => (d.data() as Order).createdAt >= startOfDay.getTime()).length
     if (todayCount >= DAILY_ORDER_LIMIT) return { success: false, error: `وصلت الحد الأقصى (${DAILY_ORDER_LIMIT} طلبات باليوم)، حاول بكرة` }
 
-    // منع تكرار نفس صورة الإيصال
+    // منع تكرار نفس صورة الإيصال (مقصور على طلبات نفس المستخدم — قواعد الأمان ما تسمح بقراءة طلبات غيره)
     const receiptHash = await hashFile(params.receiptFile)
-    const dupSnap = await getDocs(query(collection(db, ORDERS), where('receiptHash', '==', receiptHash)))
+    const dupSnap = await getDocs(query(
+      collection(db, ORDERS), where('userId', '==', params.userId), where('receiptHash', '==', receiptHash),
+    ))
     if (!dupSnap.empty) return { success: false, error: 'هذا الإيصال مرفوع مسبقاً' }
 
     // كوبون (اختياري)
@@ -120,8 +122,9 @@ export async function submitOrder(params: {
       ...(coupon ? { couponCode: coupon.code, discountAmount } : {}),
       createdAt: Date.now(),
     }
+    // ما نكتب حقل id داخل الوثيقة — قواعد الأمان تمنع المستخدم العادي من تعديل طلبه بعد إنشائه (allow update: if isAdmin())،
+    // وكل مواضع القراءة أصلاً تعتمد على معرّف الوثيقة (d.id) مو حقل id المخزّن
     const ref = await addDoc(collection(db, ORDERS), orderData)
-    await updateDoc(ref, { id: ref.id })
     const order: Order = { ...orderData, id: ref.id }
 
     if (coupon) await redeemCoupon(coupon, params.userId, ref.id, discountAmount)
