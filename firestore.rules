@@ -74,7 +74,13 @@ service cloud.firestore {
     // ── الكوبونات — قراءة عامة (نحتاجها وقت التحقق بصفحة الدفع)، كتابة للأدمن ──
     match /coupons/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      // الأدمن يعدّل أي حقل. المستخدم العادي يقدر بس يزيد usedCount بواحد وقت استخدام الكوبون (redeemCoupon) — بدون لمس باقي الحقول
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']) &&
+        request.resource.data.usedCount == resource.data.usedCount + 1
+      );
     }
     match /couponRedemptions/{id} {
       allow create: if isSignedIn();
