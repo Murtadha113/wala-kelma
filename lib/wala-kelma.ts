@@ -344,7 +344,7 @@ export async function startTurn(code: string, uid: string): Promise<{ success: t
   if (!snap.exists()) return { success: false, error: 'الغرفة غير موجودة' }
   const room = snap.val() as WalaKelmaRoom
   const picked = await drawWorkForCategories(room.categories || [], new Set(room.usedWorkIds || []), uid)
-  if (!picked) return { success: false, error: 'ما في أعمال في الفئات المختارة — أضف محتوى من الأدمن' }
+  if (!picked) return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
   const { current, exhausted } = picked
 
   const readSeconds = room.mode === 'quick' ? WK_QUICK_READ_SECONDS : WK_READ_SECONDS
