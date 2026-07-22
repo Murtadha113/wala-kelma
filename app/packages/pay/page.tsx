@@ -35,10 +35,16 @@ function PayInner() {
     setCouponErr(''); setAppliedCoupon(null)
     if (!coupon.trim() || !uid || !pkg) return
     setCouponChecking(true)
-    const res = await findAndValidateCoupon(coupon, uid, pkg.id)
-    setCouponChecking(false)
-    if (!res.valid) { setCouponErr(res.error); return }
-    setAppliedCoupon(res.coupon)
+    try {
+      const res = await findAndValidateCoupon(coupon, uid, pkg.id)
+      if (!res.valid) { setCouponErr(res.error); return }
+      setAppliedCoupon(res.coupon)
+    } catch (e) {
+      console.error('checkCoupon failed:', e)
+      setCouponErr('تعذّر التحقق من الكود، حاول مرة أخرى')
+    } finally {
+      setCouponChecking(false)
+    }
   }
   const removeCoupon = () => { setAppliedCoupon(null); setCoupon(''); setCouponErr('') }
 

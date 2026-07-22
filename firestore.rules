@@ -78,7 +78,8 @@ service cloud.firestore {
     }
     match /couponRedemptions/{id} {
       allow create: if isSignedIn();
-      allow read: if isAdmin();
+      // المستخدم يقرأ سجل استخدامه هو فقط (نحتاجها وقت التحقق من كوبون بصفحة الدفع)، والأدمن يقرأ الكل
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
     // ── الإعدادات العامة — قراءة للجميع، كتابة للأدمن ──
