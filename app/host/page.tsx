@@ -318,11 +318,18 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const color = team === 'A' ? C.violet : C.red
   const [silencePick, setSilencePick] = useState(false)
   const [turnErr, setTurnErr] = useState('')
+  const [cats, setCats] = useState<WKCategory[]>([])
+  const [pickedCatId, setPickedCatId] = useState('')
   const w = room.currentWork
+
+  useEffect(() => { getCategories(true).then(setCats) }, [])
+
+  const catName = (id: string) => id === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : (cats.find(c => c.id === id)?.name || '')
 
   const handleStartTurn = async () => {
     setTurnErr('')
-    const res = await startTurn(room.code, room.hostId)
+    const res = await startTurn(room.code, room.hostId, pickedCatId || undefined)
+    setPickedCatId('')
     if (!res.success) setTurnErr(res.error)
   }
 
@@ -362,6 +369,18 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
       {room.phase === 'idle' && (
         <>
+          {room.categories.length > 1 && (
+            <Card>
+              <SectionTitle>الفئة لهذا الدور (اختياري)</SectionTitle>
+              <Muted>ما اخترت؟ بنسحب عشوائياً من كل الفئات المختارة زي المعتاد.</Muted>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {room.categories.map(id => (
+                  <button key={id} onClick={() => setPickedCatId(prev => prev === id ? '' : id)}
+                    style={pill(pickedCatId === id)}>{catName(id)}</button>
+                ))}
+              </div>
+            </Card>
+          )}
           {room.mode === 'quick' ? (
             <Card><Muted>⚡ الوضع السريع: بدون خصائص ما قبل الدور — الجوكر متاح فقط أثناء التمثيل.</Muted></Card>
           ) : (

@@ -339,11 +339,12 @@ async function drawWorkForCategories(
   return null
 }
 
-export async function startTurn(code: string, uid: string): Promise<{ success: true; exhausted: boolean } | { success: false; error: string }> {
+export async function startTurn(code: string, uid: string, categoryId?: string): Promise<{ success: true; exhausted: boolean } | { success: false; error: string }> {
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return { success: false, error: 'الغرفة غير موجودة' }
   const room = snap.val() as WalaKelmaRoom
-  const picked = await drawWorkForCategories(room.categories || [], new Set(room.usedWorkIds || []), uid)
+  const drawFrom = categoryId && room.categories.includes(categoryId) ? [categoryId] : (room.categories || [])
+  const picked = await drawWorkForCategories(drawFrom, new Set(room.usedWorkIds || []), uid)
   if (!picked) return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
   const { current, exhausted } = picked
 

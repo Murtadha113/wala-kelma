@@ -71,48 +71,66 @@ function DisplayInner() {
       ? { name: CUSTOM_CATEGORY_NAME, imageUrl: undefined as string | undefined }
       : { name: cats.find(c => c.id === id)?.name || id, imageUrl: cats.find(c => c.id === id)?.imageUrl }
 
+    const drawColor = room.activeTeam === 'A' ? C.violet : C.red
+
     return (
-      <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(20px,4vw,48px)', gap: 24 }}>
-        <Logo height={64} priority />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 900, color: C.ink }}>{room.matchName || 'مباراة'}</div>
-          <div style={{ fontSize: 13, color: `${C.ink}66`, letterSpacing: '0.2em', marginTop: 2 }}>{room.code}</div>
-        </div>
+      <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -140, right: -100, width: 380, height: 380, borderRadius: '50%', background: `${C.orange}22`, filter: 'blur(60px)' }} />
+        <div style={{ position: 'absolute', top: 200, left: -120, width: 320, height: 320, borderRadius: '50%', background: `${C.violet}1c`, filter: 'blur(60px)' }} />
+        <div style={{ position: 'absolute', bottom: -100, right: '30%', width: 260, height: 260, borderRadius: '50%', background: `${C.red}14`, filter: 'blur(60px)' }} />
 
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 720 }}>
-          {(['A', 'B'] as TeamId[]).map(id => (
-            <div key={id} style={{ flex: '1 1 260px', background: '#fff', borderRadius: 20, padding: 20, border: `2px solid ${id === 'A' ? C.violet : C.red}33` }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: id === 'A' ? C.violet : C.red, textAlign: 'center', marginBottom: 10 }}>{room.teams[id].name}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {room.teams[id].players.map(p => (
-                  <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink, textAlign: 'center', background: C.cream, borderRadius: 10, padding: '6px 10px' }}>{p.name}</div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(20px,4vw,48px)', gap: 24 }}>
+          <Logo height={64} priority />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: C.ink }}>{room.matchName || 'مباراة'}</div>
+            <div style={{ fontSize: 13, color: `${C.ink}66`, letterSpacing: '0.2em', marginTop: 2, background: '#fff', display: 'inline-block', padding: '3px 12px', borderRadius: 999, border: `1px solid ${C.ink}12` }}>{room.code}</div>
+          </div>
 
-        <div style={{ width: '100%', maxWidth: 720 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}77`, textAlign: 'center', marginBottom: 10 }}>الفئات المختارة</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-            {room.categories.map(id => {
-              const info = catInfo(id)
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 720 }}>
+            {(['A', 'B'] as TeamId[]).map(id => {
+              const tc = id === 'A' ? C.violet : C.red
               return (
-                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 999, padding: '6px 14px 6px 6px', border: `1px solid ${C.ink}12` }}>
-                  {info.imageUrl
-                    ? <img src={info.imageUrl} alt={info.name} width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
-                    : <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎭</div>}
-                  <span style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
+                <div key={id} style={{
+                  flex: '1 1 260px', background: '#fff', borderRadius: 22, padding: 22,
+                  border: `2px solid ${tc}2a`, boxShadow: `0 10px 30px ${tc}14`,
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 12 }}>{room.teams[id].name}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {room.teams[id].players.map(p => (
+                      <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink, textAlign: 'center', background: `${tc}0d`, borderRadius: 10, padding: '8px 10px' }}>{p.name}</div>
+                    ))}
+                  </div>
                 </div>
               )
             })}
           </div>
-        </div>
 
-        <div style={{ marginTop: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 16, color: `${C.ink}88` }}>القرعة 🎲 — الفريق البادئ</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: room.activeTeam === 'A' ? C.violet : C.red, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
-          {slot && <div style={{ fontSize: 18, fontWeight: 700, color: C.ink, marginTop: 6 }}>أول لاعب: {slot.playerName}</div>}
+          <div style={{ width: '100%', maxWidth: 720 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}77`, textAlign: 'center', marginBottom: 10 }}>الفئات المختارة</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+              {room.categories.map(id => {
+                const info = catInfo(id)
+                return (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 999, padding: '6px 14px 6px 6px', border: `1px solid ${C.ink}12`, boxShadow: `0 4px 14px ${C.ink}0a` }}>
+                    {info.imageUrl
+                      ? <img src={info.imageUrl} alt={info.name} width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                      : <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎭</div>}
+                    <span style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 8, textAlign: 'center', width: '100%', maxWidth: 420, borderRadius: 24, padding: '22px 24px',
+            background: `linear-gradient(135deg, ${drawColor}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
+            color: '#fff', boxShadow: `0 14px 36px ${drawColor}33`,
+          }}>
+            <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>القرعة 🎲 — الفريق البادئ</div>
+            <div style={{ fontSize: 34, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
+            {slot && <div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
+          </div>
         </div>
       </div>
     )
@@ -141,6 +159,7 @@ function DisplayInner() {
   const activeColor = room.activeTeam === 'A' ? C.violet : C.red
   const timed = room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing'
   const stealing = room.phase === 'stealing'
+  const categoryName = (id: string) => id === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : (cats.find(c => c.id === id)?.name || '')
 
   return (
     <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)' }}>
@@ -169,6 +188,11 @@ function DisplayInner() {
           <div style={{ fontSize: 20, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 40, fontWeight: 900, color: activeColor }}>{room.teams[room.activeTeam].name}</div>
           {slot && <div style={{ fontSize: 24, fontWeight: 700, color: C.ink }}>يمثّل الآن: {slot.playerName}</div>}
+          {timed && room.currentWork && (
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 16px', borderRadius: 999 }}>
+              🎬 الفئة: {categoryName(room.currentWork.categoryId)}
+            </div>
+          )}
         </>}
 
         {room.silencedPlayerId && (room.phase === 'acting' || room.phase === 'stealing') && (
