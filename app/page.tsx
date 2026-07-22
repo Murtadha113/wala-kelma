@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthChange, type UserProfile, getUserProfile } from '@/lib/auth'
-import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { WK_COLORS, WK_POWERUPS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 
 const C = WK_COLORS
@@ -19,6 +19,23 @@ const FEATURES = [
   { emoji: '🎭', title: 'فئات متنوعة', desc: 'أفلام، مسلسلات، مسرحيات خليجية وعربية وأجنبية، وأمثال شعبية' },
   { emoji: '⭐', title: 'فئتك الخاصة', desc: 'أضف أعمال وأسماء من عندك تخص شلتك أو عائلتك' },
   { emoji: '🏆', title: 'أفضل ممثل + صدارة', desc: 'شارك النتيجة، وتابع لوحة الصدارة مع أصدقائك شهرياً' },
+]
+
+const SCREENS_GUIDE = [
+  {
+    emoji: '📱', title: 'شاشة المقدّم (الهاتف)', badge: '١',
+    desc: 'يفتحها الشخص اللي يمسك الجوال ويدير اللعبة — فيها كل أزرار التحكم: بدء الدور، صح/غلط، السرقة، الخصائص، والإيقاف المؤقت.',
+    steps: ['اضغط "سوّ مباراة جديدة" من الرئيسية', 'اختر الفئات وسجّل أسماء الفرق واللاعبين', 'ابدأ المباراة وتحكّم بكل خطوة من نفس الشاشة'],
+  },
+  {
+    emoji: '📺', title: 'شاشة العرض (تلفاز/لابتوب)', badge: '٢',
+    desc: 'تفتح على شاشة كبيرة يشوفها الكل — تعرض بس (بدون أي أزرار تحكم): كود المباراة، الفرق، والنتيجة الحية.',
+    steps: ['من شاشة المقدّم، انسخ رابط العرض أو امسح الـQR', 'افتحه على تلفاز أو لابتوب متصل بالواي فاي نفسه', 'يتزامن تلقائياً مع كل حركة يسويها المقدّم'],
+  },
+]
+
+const HELP_TOOLS = [
+  ...WK_POWERUPS.map(p => ({ emoji: p.icon, title: p.name, desc: p.desc, when: p.preTurn ? 'تفعّلها قبل بداية دور فريقك' : 'تفعّلها أي وقت خلال دوركم' })),
 ]
 
 export default function LandingPage() {
@@ -119,6 +136,43 @@ export default function LandingPage() {
               <div style={{ fontSize: 34, marginBottom: 8 }}>{s.emoji}</div>
               <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>{s.title}</div>
               <div style={{ fontSize: 12.5, color: `${C.ink}88`, lineHeight: 1.6 }}>{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── شرح الشاشتين ── */}
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 8px' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: C.ink, marginBottom: 4 }}>طريقة تشغيل الشاشتين</h2>
+        <p style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}77`, marginBottom: 24 }}>اللعبة تحتاج شاشتين — وحدة تتحكم، وحدة تعرض للجميع</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+          {SCREENS_GUIDE.map((s, i) => (
+            <div key={i} style={{ background: '#fff', borderRadius: 20, padding: 20, border: `1px solid ${C.ink}10`, position: 'relative' }}>
+              <div style={{ position: 'absolute', top: 14, left: 16, fontSize: 11, fontWeight: 900, color: `${C.ink}30` }}>{s.badge}</div>
+              <div style={{ fontSize: 30, marginBottom: 6 }}>{s.emoji}</div>
+              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>{s.title}</div>
+              <div style={{ fontSize: 12.5, color: `${C.ink}88`, lineHeight: 1.7, marginBottom: 10 }}>{s.desc}</div>
+              <ol style={{ margin: 0, paddingInlineStart: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {s.steps.map((step, si) => (
+                  <li key={si} style={{ fontSize: 12, color: `${C.ink}99`, lineHeight: 1.6 }}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── وسائل المساعدة (الخصائص) ── */}
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 8px' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: C.ink, marginBottom: 4 }}>وسائل المساعدة</h2>
+        <p style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}77`, marginBottom: 24 }}>خصائص تقلب موازين اللعبة — كل فريق يقدر يستخدمها مرة كل دور</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+          {HELP_TOOLS.map((h, i) => (
+            <div key={i} style={{ background: '#fff', borderRadius: 20, padding: '20px 16px', border: `1px solid ${C.ink}10`, textAlign: 'center' }}>
+              <div style={{ fontSize: 30, marginBottom: 8 }}>{h.emoji}</div>
+              <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>{h.title}</div>
+              <div style={{ fontSize: 12.5, color: `${C.ink}88`, lineHeight: 1.6, marginBottom: 6 }}>{h.desc}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.violet }}>{h.when}</div>
             </div>
           ))}
         </div>
