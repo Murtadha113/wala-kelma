@@ -8,31 +8,63 @@ import {
   WKCategory, WalaKelmaWork, NewWork, Difficulty,
 } from '@/lib/works'
 import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/components/admin-ui'
-import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/admin/business-tabs'
+import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/itsadmin1/business-tabs'
 import { Logo } from '@/components/logo'
+import { onAuthChange, signIn, signOutUser, getUserProfile, authErrorMessage } from '@/lib/auth'
+
+type GateState = 'checking' | 'signedOut' | 'denied' | 'granted'
 
 export default function AdminPage() {
-  const [unlocked, setUnlocked] = useState(false)
-  const [pass, setPass] = useState('')
+  const [gate, setGate] = useState<GateState>('checking')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const [tab, setTab] = useState<'dashboard' | 'works' | 'categories' | 'import' | 'orders' | 'users' | 'packages' | 'coupons' | 'settings'>('dashboard')
 
-  useEffect(() => { if (sessionStorage.getItem('wk_admin') === '1') setUnlocked(true) }, [])
+  useEffect(() => onAuthChange(async user => {
+    if (!user) { setGate('signedOut'); return }
+    const profile = await getUserProfile(user.uid)
+    setGate(profile?.isAdmin ? 'granted' : 'denied')
+  }), [])
 
-  const tryUnlock = () => {
-    const expected = process.env.NEXT_PUBLIC_ADMIN_PASSCODE || 'change-me'
-    if (pass === expected) { sessionStorage.setItem('wk_admin', '1'); setUnlocked(true) }
-    else alert('كلمة المرور غير صحيحة')
+  const submit = async () => {
+    setErr('')
+    if (!email.trim() || !password) { setErr('عبّي الإيميل وكلمة المرور'); return }
+    setBusy(true)
+    try {
+      await signIn(email.trim(), password)
+      // onAuthChange يتكفّل بتحديث الحالة بعد نجاح الدخول
+    } catch (e) {
+      setErr(authErrorMessage((e as { code?: string }).code || ''))
+    }
+    setBusy(false)
   }
 
-  if (!unlocked) {
+  if (gate === 'checking') return null
+
+  if (gate === 'signedOut') {
     return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center' }}><Logo height={54} /></div>
-        <div style={{ fontSize: 15, fontWeight: 800, marginTop: 8, marginBottom: 16 }}>لوحة إدارة المحتوى</div>
-        <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="كلمة المرور"
-          onKeyDown={e => e.key === 'Enter' && tryUnlock()}
-          style={{ width: '100%', padding: 12, borderRadius: 12, border: `1px solid ${C.ink}20`, fontSize: 15, textAlign: 'center', outline: 'none', background: C.cream }} />
-        <button onClick={tryUnlock} style={{ ...primaryBtn, marginTop: 12 }}>دخول</button>
+        <div style={{ fontSize: 15, fontWeight: 800, marginTop: 8, marginBottom: 16 }}>دخول لوحة الإدارة</div>
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="الإيميل" type="email"
+          style={{ width: '100%', padding: 12, borderRadius: 12, border: `1px solid ${C.ink}20`, fontSize: 15, outline: 'none', background: C.cream, marginBottom: 10 }} />
+        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور" type="password"
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          style={{ width: '100%', padding: 12, borderRadius: 12, border: `1px solid ${C.ink}20`, fontSize: 15, outline: 'none', background: C.cream }} />
+        {err && <p style={{ color: C.red, fontSize: 13, fontWeight: 700, marginTop: 8 }}>{err}</p>}
+        <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 12, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : 'دخول'}</button>
+      </div>
+    </div>
+  }
+
+  if (gate === 'denied') {
+    return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>حسابك ما عنده صلاحية دخول لوحة الإدارة</div>
+        <button onClick={() => signOutUser()} style={ghostBtn}>تسجيل خروج</button>
       </div>
     </div>
   }
@@ -45,7 +77,10 @@ export default function AdminPage() {
             <Logo height={28} />
             <span style={{ fontSize: 15, fontWeight: 800, color: `${C.ink}99` }}>· الإدارة</span>
           </div>
-          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => signOutUser()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: `${C.ink}88` }}>تسجيل خروج</button>
+            <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, marginBottom: 16, flexWrap: 'wrap' }}>

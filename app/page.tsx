@@ -145,7 +145,7 @@ export default function LandingPage() {
       <section style={{ maxWidth: 640, margin: '0 auto', padding: '10px 20px 40px', textAlign: 'center' }}>
         <div style={{ background: `linear-gradient(135deg, ${C.violet}, #4726c9)`, borderRadius: 24, padding: '28px 24px', color: '#fff' }}>
           <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 6 }}>جهّز الشلة وابدأوا الآن 🎉</div>
-          <p style={{ fontSize: 13, opacity: 0.9, marginBottom: 18 }}>لعبة مجانية أول تسجيل — بدون ما تدفع ريال</p>
+          <p style={{ fontSize: 13, opacity: 0.9, marginBottom: 18 }}>لعبة مجانية أول تسجيل</p>
           <button onClick={() => router.push(profile ? '/host' : '/signup')}
             className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
             style={{ background: '#fff', color: C.violet, border: 'none', borderRadius: 14, padding: '14px 32px', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>

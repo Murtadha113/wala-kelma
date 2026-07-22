@@ -147,7 +147,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
       {step === 1 && (
         <Card>
           <SectionTitle>الفئات (حتى {WK_MAX_CATEGORIES}) — مختار: {selected.length}</SectionTitle>
-          {cats.length === 0 && <Muted>لا توجد فئات بعد — افتح <a href="/admin" style={{ color: C.violet }}>لوحة الأدمن</a> وأضف الفئات والأعمال.</Muted>}
+          {cats.length === 0 && <Muted>لا توجد فئات بعد — أضفها من لوحة الإدارة.</Muted>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 10, marginTop: 10 }}>
             {cats.map(c => <CategoryCard key={c.id} name={c.name} imageUrl={c.imageUrl} selected={selected.includes(c.id)} onClick={() => toggleCat(c.id)} />)}
             {customCount > 0 && (
