@@ -9,7 +9,7 @@ import { getCustomWorksCount, CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@
 import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
-  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, togglePause, resetPhaseTimer,
+  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, undoJoker, togglePause, resetPhaseTimer,
   toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, getBestActor,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
@@ -400,16 +400,16 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {WK_POWERUPS.filter(p => p.preTurn).map(p => {
                   const used = room.powerUpsUsed[team][p.id]
-                  const active = room.activePowerUps[p.id as 'double' | 'silence']
+                  const active = room.activePowerUps[p.id as 'double' | 'deduct' | 'silence']
                   return (
                     <div key={p.id} style={{ display: 'flex', gap: 6 }}>
                       <button disabled={used && !active} style={{ ...powerBtn(p.color, active, used), flex: 1 }}
-                        onClick={() => { if (used) return; if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double') }}>
+                        onClick={() => { if (used) return; if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double' | 'deduct') }}>
                         <span>{p.icon} {p.name}</span>
                         <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور ✓' : used ? 'استُخدمت' : p.desc}</span>
                       </button>
                       {active && (
-                        <button onClick={() => { deactivatePowerUp(room.code, team, p.id as 'double' | 'silence'); setSilencePick(false) }}
+                        <button onClick={() => { deactivatePowerUp(room.code, team, p.id as 'double' | 'deduct' | 'silence'); setSilencePick(false) }}
                           style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
                       )}
                     </div>
@@ -479,7 +479,14 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
             <button onClick={() => togglePause(room.code)} style={{ ...ghostBtn, flex: 1 }}>{room.paused ? '▶️ استئناف' : '⏸ إيقاف'}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>🔄 إعادة الوقت</button>
           </div>
-          {room.joker && <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : 'إعادة تمثيل بعمل جديد'}</div>}
+          {room.joker && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>
+                🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
+              </div>
+              <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
+            </div>
+          )}
           <SkipCancelRow room={room} />
         </>
       )}

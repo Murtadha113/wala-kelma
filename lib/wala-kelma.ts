@@ -27,8 +27,8 @@ export type WKStatus = 'setup' | 'draw' | 'playing' | 'finished'
 
 export interface WKJokerState { outcome: JokerOutcome; ts: number }
 export interface WKTurnSlot { team: TeamId; playerId: string; playerName: string }
-export interface WKActivePowerUps { double: boolean; silence: boolean }
-export interface WKPowerUpsUsed { double: boolean; silence: boolean; joker: boolean }
+export interface WKActivePowerUps { double: boolean; deduct: boolean; silence: boolean }
+export interface WKPowerUpsUsed { double: boolean; deduct: boolean; silence: boolean; joker: boolean }
 
 export interface WKCurrentWork {
   workId: string; title: string; posterUrl: string
@@ -82,8 +82,8 @@ export interface WalaKelmaRoom {
   actorCorrectCounts: Record<string, number>   // playerId → عدد مرات نجح تمثيله (بدون سرقة) — لـ"أفضل ممثل"
 }
 
-const EMPTY_POWERUPS: WKActivePowerUps = { double: false, silence: false }
-const EMPTY_USED: WKPowerUpsUsed = { double: false, silence: false, joker: false }
+const EMPTY_POWERUPS: WKActivePowerUps = { double: false, deduct: false, silence: false }
+const EMPTY_USED: WKPowerUpsUsed = { double: false, deduct: false, silence: false, joker: false }
 
 async function uniqueCode(): Promise<string> {
   let code = generateCode()
@@ -429,6 +429,7 @@ export async function markCorrect(code: string, scoringTeam: TeamId): Promise<vo
   if (room.phase !== 'acting' && room.phase !== 'stealing') return
 
   const isSteal = room.phase === 'stealing' || scoringTeam !== room.activeTeam
+  const other: TeamId = scoringTeam === 'A' ? 'B' : 'A'
   let points = 1
   if (!isSteal && room.activePowerUps?.double) points = 2
 
@@ -437,6 +438,9 @@ export async function markCorrect(code: string, scoringTeam: TeamId): Promise<vo
     phase: 'resolved',
     phaseEndsAt: null,
     lastResult: { team: scoringTeam, type: isSteal ? 'steal' : 'correct', points, ts: Date.now() },
+  }
+  if (!isSteal && room.activePowerUps?.deduct) {
+    patch[`teams/${other}/score`] = Math.max(0, (room.teams[other].score || 0) - 1)
   }
   // نجاح تمثيل حقيقي (بدون سرقة) — يُحسب لصاحب الدور الحالي لـ"أفضل ممثل"
   if (!isSteal) {
@@ -473,8 +477,25 @@ export async function useJoker(code: string): Promise<JokerOutcome | null> {
     joker: { outcome, ts: Date.now() },
   }
   if (outcome === 'addPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) + 1
+  else if (outcome === 'deductPoint') patch[`teams/${team}/score`] = Math.max(0, (room.teams[team].score || 0) - 1)
   await update(ref(rtdb, `${ROOMS}/${code}`), patch)
   return outcome
+}
+
+// تراجع عن نتيجة الجوكر (لو اتفعّل بالغلط) — يرجّع النقاط ويسمح باستخدامه من جديد
+export async function undoJoker(code: string): Promise<void> {
+  const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
+  if (!snap.exists()) return
+  const room = snap.val() as WalaKelmaRoom
+  if (!room.joker) return
+  const team = room.activeTeam
+  const patch: Record<string, unknown> = {
+    [`powerUpsUsed/${team}/joker`]: false,
+    joker: null,
+  }
+  if (room.joker.outcome === 'addPoint') patch[`teams/${team}/score`] = Math.max(0, (room.teams[team].score || 0) - 1)
+  else if (room.joker.outcome === 'deductPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) + 1
+  await update(ref(rtdb, `${ROOMS}/${code}`), patch)
 }
 
 // ── الانتقال بين الأدوار والجولات ──
@@ -668,7 +689,7 @@ export async function adjustScore(code: string, teamId: TeamId, delta: number): 
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return
   const room = snap.val() as WalaKelmaRoom
-  await update(ref(rtdb, `${ROOMS}/${code}/teams/${teamId}`), { score: (room.teams[teamId].score || 0) + delta })
+  await update(ref(rtdb, `${ROOMS}/${code}/teams/${teamId}`), { score: Math.max(0, (room.teams[teamId].score || 0) + delta) })
 }
 
 export async function skipTurn(code: string): Promise<void> {
