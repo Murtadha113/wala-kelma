@@ -189,12 +189,12 @@ function DisplayInner() {
           <div style={{ fontSize: 20, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 40, fontWeight: 900, color: activeColor }}>{room.teams[room.activeTeam].name}</div>
           {slot && <div style={{ fontSize: 24, fontWeight: 700, color: C.ink }}>يمثّل الآن: {slot.playerName}</div>}
-          {timed && room.currentWork && (
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 16px', borderRadius: 999 }}>
-              🎬 الفئة: {categoryName(room.currentWork.categoryId)}
-            </div>
-          )}
         </>}
+        {timed && room.currentWork && (
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 16px', borderRadius: 999 }}>
+            🎬 الفئة: {categoryName(room.currentWork.categoryId)}
+          </div>
+        )}
 
         {room.silencedPlayerId && (room.phase === 'acting' || room.phase === 'stealing') && (
           <div style={{ fontSize: 16, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 14px', borderRadius: 999 }}>🤫 لاعب مُسكت هذا الدور</div>
