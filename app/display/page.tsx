@@ -111,11 +111,11 @@ function DisplayInner() {
               {room.categories.map(id => {
                 const info = catInfo(id)
                 return (
-                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 999, padding: '6px 14px 6px 6px', border: `1px solid ${C.ink}12`, boxShadow: `0 4px 14px ${C.ink}0a` }}>
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 16, padding: '8px 16px 8px 8px', border: `1px solid ${C.ink}12`, boxShadow: `0 4px 14px ${C.ink}0a` }}>
                     {info.imageUrl
-                      ? <img src={info.imageUrl} alt={info.name} width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
-                      : <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎭</div>}
-                    <span style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
+                      ? <img src={info.imageUrl} alt={info.name} width={44} height={44} style={{ borderRadius: 10, objectFit: 'cover' }} />
+                      : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎭</div>}
+                    <span style={{ fontSize: 14, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
                   </div>
                 )
               })}
@@ -159,7 +159,6 @@ function DisplayInner() {
   const activeColor = room.activeTeam === 'A' ? C.violet : C.red
   const timed = room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing'
   const stealing = room.phase === 'stealing'
-  const categoryName = (id: string) => id === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : (cats.find(c => c.id === id)?.name || '')
 
   return (
     <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)', position: 'relative', overflow: 'hidden' }}>
@@ -190,16 +189,6 @@ function DisplayInner() {
           <div style={{ fontSize: 40, fontWeight: 900, color: activeColor }}>{room.teams[room.activeTeam].name}</div>
           {slot && <div style={{ fontSize: 24, fontWeight: 700, color: C.ink }}>يمثّل الآن: {slot.playerName}</div>}
         </>}
-        {room.phase === 'idle' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 420 }}>
-            {room.categories.map(id => (
-              <span key={id} style={{ fontSize: 12, fontWeight: 800, color: `${C.ink}99`, background: '#fff', border: `1px solid ${C.ink}14`, borderRadius: 999, padding: '6px 14px' }}>
-                🎭 {categoryName(id)}
-              </span>
-            ))}
-          </div>
-        )}
-
         {room.silencedPlayerId && (room.phase === 'acting' || room.phase === 'stealing') && (
           <div style={{ fontSize: 16, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 14px', borderRadius: 999 }}>🤫 لاعب مُسكت هذا الدور</div>
         )}
