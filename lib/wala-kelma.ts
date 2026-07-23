@@ -8,6 +8,7 @@ import { pickRandomWork, WalaKelmaWork } from './works'
 import { pickRandomCustomWork, CUSTOM_CATEGORY_ID, type CustomWork } from './custom-works'
 import { getUserProfile, updateUserProfile } from './auth'
 import { recordGroupResult } from './friend-groups'
+import { getGameplaySettings } from './game-settings'
 import {
   WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_QUICK_EXPLAIN,
   type ExplainDuration, type PreTurnPowerUp,
@@ -50,6 +51,8 @@ export interface WalaKelmaRoom {
   mode: 'full' | 'quick'
   totalRounds: number
   currentRound: number
+  questionsPerRound: number   // عدد الأسئلة/الأدوار بكل جولة — يضبطه الأدمن من الإعدادات
+  turnsThisRound: number      // عدّاد الأدوار اللي لعبت بالجولة الحالية
 
   roundStartingTeam: TeamId
   turnOrder: WKTurnSlot[]
@@ -107,6 +110,8 @@ function baseRoom(hostId: string, hostName: string, code: string): Omit<WalaKelm
     mode: 'full',
     totalRounds: 2,
     currentRound: 0,
+    questionsPerRound: 5,
+    turnsThisRound: 0,
     roundStartingTeam: 'A',
     turnOrder: [],
     currentTurnIndex: 0,
@@ -135,7 +140,10 @@ export async function createWalaKelmaRoom(params: {
 }): Promise<{ success: true; code: string } | { success: false; error: string }> {
   try {
     const code = await uniqueCode()
-    await set(ref(rtdb, `${ROOMS}/${code}`), baseRoom(params.hostId, params.hostName, code))
+    const gameplay = await getGameplaySettings()
+    const room = baseRoom(params.hostId, params.hostName, code)
+    room.questionsPerRound = gameplay.questionsPerRound
+    await set(ref(rtdb, `${ROOMS}/${code}`), room)
     return { success: true, code }
   } catch (e) {
     console.error('createWalaKelmaRoom:', e)
@@ -173,6 +181,8 @@ function normalizeRoom(raw: any, code: string): WalaKelmaRoom {
     phaseEndsAt: r.phaseEndsAt ?? null,
     paused: r.paused ?? false,
     pausedRemainingMs: r.pausedRemainingMs ?? null,
+    questionsPerRound: r.questionsPerRound || 5,
+    turnsThisRound: r.turnsThisRound ?? 0,
     silencedPlayerId: r.silencedPlayerId ?? null,
     joker: r.joker ?? null,
     winner: r.winner ?? null,
@@ -463,7 +473,6 @@ export async function nextTurn(code: string): Promise<void> {
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return
   const room = snap.val() as WalaKelmaRoom
-  const nextIndex = room.currentTurnIndex + 1
   const resetTurn = {
     currentWork: null,
     phase: 'idle' as WKPhase,
@@ -475,11 +484,31 @@ export async function nextTurn(code: string): Promise<void> {
     silencedPlayerId: null,
     joker: null,
   }
-  if (nextIndex < room.turnOrder.length) {
+
+  // الفاصلة (تعادل): تنتهي بمجرد ما يلعب ممثّل الفريقين مرة وحدة — بدون علاقة بعدد الأسئلة بالجولة
+  if (room.isTiebreak) {
+    const nextIndex = room.currentTurnIndex + 1
+    if (nextIndex < room.turnOrder.length) {
+      await update(ref(rtdb, `${ROOMS}/${code}`), {
+        ...resetTurn, currentTurnIndex: nextIndex, activeTeam: room.turnOrder[nextIndex].team,
+      })
+      return
+    }
+    await endRoundOrMatch(code, room, resetTurn)
+    return
+  }
+
+  // الجولة العادية: تستمر حتى يوصل عدد الأسئلة الملعوبة لعدد الأسئلة بالجولة (يضبطه الأدمن)،
+  // واللاعبون يتناوبون بالدور (تكرار المرور على القائمة لو لزم) بدل التوقف عند آخر لاعب
+  const turnsThisRound = (room.turnsThisRound || 0) + 1
+  const questionsPerRound = room.questionsPerRound > 0 ? room.questionsPerRound : room.turnOrder.length
+  if (turnsThisRound < questionsPerRound && room.turnOrder.length > 0) {
+    const nextIndex = (room.currentTurnIndex + 1) % room.turnOrder.length
     await update(ref(rtdb, `${ROOMS}/${code}`), {
       ...resetTurn,
       currentTurnIndex: nextIndex,
       activeTeam: room.turnOrder[nextIndex].team,
+      turnsThisRound,
     })
     return
   }
@@ -524,6 +553,7 @@ async function endRoundOrMatch(code: string, room: WalaKelmaRoom, resetTurn: Rec
     currentTurnIndex: 0,
     activeTeam: order[0].team,
     phase: 'roundEnd',
+    turnsThisRound: 0,
   })
 }
 

@@ -9,6 +9,7 @@ import { getAllPackages, addPackage, updatePackage, deletePackage, type Package,
 import { getAllCoupons, addCoupon, updateCoupon, deleteCoupon, type Coupon, type NewCoupon, type CouponType } from '@/lib/coupons'
 import { getPaymentSettings, setPaymentSettings, type PaymentSettings } from '@/lib/payments'
 import { getContactSettings, setContactSettings, type ContactSettings } from '@/lib/contact'
+import { getGameplaySettings, setGameplaySettings, type GameplaySettings } from '@/lib/game-settings'
 import { getCategories } from '@/lib/works'
 
 const ADMIN_ID = 'admin' // بوابة الأدمن الحالية بكلمة مرور بدون حسابات مصادقة منفصلة للأدمن
@@ -373,8 +374,42 @@ export function SettingsTab() {
         {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{err}</p>}
         <button onClick={save} style={primaryBtn}>{saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}</button>
       </Card>
+      <GameplaySettingsCard />
       <ContactSettingsCard />
     </div>
+  )
+}
+
+function GameplaySettingsCard() {
+  const [g, setG] = useState<GameplaySettings | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => { getGameplaySettings().then(setG) }, [])
+
+  if (!g) return <Card><Muted>جاري التحميل…</Muted></Card>
+
+  const save = async () => {
+    setErr('')
+    if (!Number.isFinite(g.questionsPerRound) || g.questionsPerRound < 1) { setErr('العدد لازم يكون 1 أو أكثر'); return }
+    try {
+      await setGameplaySettings(g)
+      setSaved(true); setTimeout(() => setSaved(false), 1500)
+    } catch (e) {
+      console.error('setGameplaySettings failed:', e)
+      setErr('فشل الحفظ: ' + (e as Error).message)
+    }
+  }
+
+  return (
+    <Card>
+      <SectionTitle>إعدادات اللعب</SectionTitle>
+      <Muted>عدد الأسئلة (الأدوار) بكل جولة — يطبّق على كل مباراة جديدة تُنشأ بعد الحفظ (ما يأثر على مباريات جارية حالياً).</Muted>
+      <input type="number" min={1} value={g.questionsPerRound}
+        onChange={e => setG({ ...g, questionsPerRound: Number(e.target.value) })}
+        placeholder="عدد الأسئلة بكل جولة" style={input} />
+      {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{err}</p>}
+      <button onClick={save} style={primaryBtn}>{saved ? '✓ تم الحفظ' : 'حفظ'}</button>
+    </Card>
   )
 }
 

@@ -177,7 +177,9 @@ function DisplayInner() {
         <Logo height={30} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>{room.matchName || 'مباراة'}</div>
-          <div style={{ fontSize: 13, color: `${C.ink}88` }}>{room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound} من ${room.totalRounds}`}</div>
+          <div style={{ fontSize: 13, color: `${C.ink}88` }}>
+            {room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound} من ${room.totalRounds} — سؤال ${Math.min((room.turnsThisRound || 0) + 1, room.questionsPerRound || 1)} من ${room.questionsPerRound}`}
+          </div>
         </div>
         <div style={{ fontSize: 14, fontWeight: 800, color: `${C.ink}66`, letterSpacing: '0.2em' }}>{room.code}</div>
       </div>

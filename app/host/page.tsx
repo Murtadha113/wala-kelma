@@ -341,7 +341,9 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>{room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound}/${room.totalRounds}`}</div>
+        <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>
+          {room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound}/${room.totalRounds} — سؤال ${Math.min((room.turnsThisRound || 0) + 1, room.questionsPerRound || 1)}/${room.questionsPerRound}`}
+        </div>
         <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}66`, letterSpacing: '0.15em' }}>{room.code}</div>
       </div>
       {turnErr && <Card><p style={{ color: C.red, fontWeight: 700, fontSize: 13, margin: 0 }}>{turnErr}</p></Card>}
