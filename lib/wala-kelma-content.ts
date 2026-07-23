@@ -23,7 +23,7 @@ export const WK_MAX_PLAYERS_PER_TEAM = 8
 export const WK_MAX_CATEGORIES = 4
 
 // ── الخصائص (Power-Ups) ──
-export type PreTurnPowerUp = 'double' | 'deduct' | 'silence'
+export type PreTurnPowerUp = 'double' | 'silence'
 export type PowerUpId = PreTurnPowerUp | 'joker'
 
 export interface PowerUpDef {
@@ -37,17 +37,15 @@ export interface PowerUpDef {
 
 export const WK_POWERUPS: PowerUpDef[] = [
   { id: 'double',  name: 'مضاعفة النقطة', icon: '✖️2', desc: 'إذا خمّن فريقك صح تحصل نقطتين بدل نقطة', color: '#27AE78', preTurn: true },
-  { id: 'deduct',  name: 'خصم نقطة',      icon: '➖',   desc: 'إذا خمّن فريقك صح تُخصم نقطة من الخصم', color: WK_COLORS.red, preTurn: true },
   { id: 'silence', name: 'إسكات لاعب',    icon: '🤫',   desc: 'تختار لاعب من الخصم يُمنع من التخمين هذا الدور', color: WK_COLORS.violet, preTurn: true },
   { id: 'joker',   name: 'الجوكر',        icon: '🃏',   desc: 'يُفعّل أي وقت خلال دور فريقك — نتيجة عشوائية', color: WK_COLORS.orange, preTurn: false },
 ]
 
 // ── نتائج الجوكر العشوائية ──
-export type JokerOutcome = 'addPoint' | 'redoWithNewWork' | 'deductPoint'
+export type JokerOutcome = 'addPoint' | 'redoWithNewWork'
 export const WK_JOKER_OUTCOMES: { id: JokerOutcome; label: string; emoji: string }[] = [
   { id: 'addPoint',        label: 'إضافة نقطة لفريقك',           emoji: '➕' },
   { id: 'redoWithNewWork', label: 'إعادة التمثيل مع عمل جديد',   emoji: '🔁' },
-  { id: 'deductPoint',     label: 'خصم نقطة من فريقك',           emoji: '➖' },
 ]
 
 export function drawJokerOutcome(): JokerOutcome {

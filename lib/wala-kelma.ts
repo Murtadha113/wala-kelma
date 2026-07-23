@@ -2,7 +2,7 @@
 // شاشتان: المقدم (يكتب) + العرض (قراءة فقط). المؤقّت مشتق من phaseEndsAt (timestamp).
 import { ref, set, get, onValue, off, update, remove } from 'firebase/database'
 import { doc, writeBatch, increment } from 'firebase/firestore'
-import { rtdb, db } from './firebase'
+import { rtdb, db, serverNow } from './firebase'
 import { generateCode } from './code'
 import { pickRandomWork, WalaKelmaWork } from './works'
 import { pickRandomCustomWork, CUSTOM_CATEGORY_ID, type CustomWork } from './custom-works'
@@ -27,8 +27,8 @@ export type WKStatus = 'setup' | 'draw' | 'playing' | 'finished'
 
 export interface WKJokerState { outcome: JokerOutcome; ts: number }
 export interface WKTurnSlot { team: TeamId; playerId: string; playerName: string }
-export interface WKActivePowerUps { double: boolean; deduct: boolean; silence: boolean }
-export interface WKPowerUpsUsed { double: boolean; deduct: boolean; silence: boolean; joker: boolean }
+export interface WKActivePowerUps { double: boolean; silence: boolean }
+export interface WKPowerUpsUsed { double: boolean; silence: boolean; joker: boolean }
 
 export interface WKCurrentWork {
   workId: string; title: string; posterUrl: string
@@ -82,8 +82,8 @@ export interface WalaKelmaRoom {
   actorCorrectCounts: Record<string, number>   // playerId → عدد مرات نجح تمثيله (بدون سرقة) — لـ"أفضل ممثل"
 }
 
-const EMPTY_POWERUPS: WKActivePowerUps = { double: false, deduct: false, silence: false }
-const EMPTY_USED: WKPowerUpsUsed = { double: false, deduct: false, silence: false, joker: false }
+const EMPTY_POWERUPS: WKActivePowerUps = { double: false, silence: false }
+const EMPTY_USED: WKPowerUpsUsed = { double: false, silence: false, joker: false }
 
 async function uniqueCode(): Promise<string> {
   let code = generateCode()
@@ -305,6 +305,20 @@ export async function activatePowerUp(code: string, teamId: TeamId, powerUp: Pre
   })
 }
 
+// تراجع عن خاصية فُعّلت بالغلط قبل بدء الدور — يعيدها متاحة للاختيار من جديد
+export async function deactivatePowerUp(code: string, teamId: TeamId, powerUp: PreTurnPowerUp): Promise<void> {
+  const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
+  if (!snap.exists()) return
+  const room = snap.val() as WalaKelmaRoom
+  if (room.phase !== 'idle' || room.activeTeam !== teamId) return
+  if (!room.activePowerUps?.[powerUp]) return
+  await update(ref(rtdb, `${ROOMS}/${code}`), {
+    [`activePowerUps/${powerUp}`]: false,
+    [`powerUpsUsed/${teamId}/${powerUp}`]: false,
+    ...(powerUp === 'silence' ? { silencedPlayerId: null } : {}),
+  })
+}
+
 // ── محرّك الدور ──
 function workToCurrent(w: WalaKelmaWork): WKCurrentWork {
   return {
@@ -363,7 +377,7 @@ export async function startTurn(code: string, uid: string, categoryId?: string):
     currentWork: current,
     usedWorkIds: [...(room.usedWorkIds || []), current.workId],
     phase: 'reading',
-    phaseEndsAt: Date.now() + readSeconds * 1000,
+    phaseEndsAt: serverNow() + readSeconds * 1000,
     paused: false,
     pausedRemainingMs: null,
     questionHidden: false,
@@ -380,7 +394,7 @@ export async function beginActing(code: string): Promise<void> {
   if (room.phase !== 'reading') return
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     phase: 'acting',
-    phaseEndsAt: Date.now() + room.explainDuration * 1000,
+    phaseEndsAt: serverNow() + room.explainDuration * 1000,
   })
 }
 
@@ -391,7 +405,7 @@ export async function onActingTimeUp(code: string): Promise<void> {
   if (room.phase !== 'acting') return
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     phase: 'stealing',
-    phaseEndsAt: Date.now() + WK_STEAL_SECONDS * 1000,
+    phaseEndsAt: serverNow() + WK_STEAL_SECONDS * 1000,
     'activePowerUps/double': false,
   })
 }
@@ -415,7 +429,6 @@ export async function markCorrect(code: string, scoringTeam: TeamId): Promise<vo
   if (room.phase !== 'acting' && room.phase !== 'stealing') return
 
   const isSteal = room.phase === 'stealing' || scoringTeam !== room.activeTeam
-  const other: TeamId = scoringTeam === 'A' ? 'B' : 'A'
   let points = 1
   if (!isSteal && room.activePowerUps?.double) points = 2
 
@@ -424,9 +437,6 @@ export async function markCorrect(code: string, scoringTeam: TeamId): Promise<vo
     phase: 'resolved',
     phaseEndsAt: null,
     lastResult: { team: scoringTeam, type: isSteal ? 'steal' : 'correct', points, ts: Date.now() },
-  }
-  if (!isSteal && room.activePowerUps?.deduct) {
-    patch[`teams/${other}/score`] = (room.teams[other].score || 0) - 1
   }
   // نجاح تمثيل حقيقي (بدون سرقة) — يُحسب لصاحب الدور الحالي لـ"أفضل ممثل"
   if (!isSteal) {
@@ -443,7 +453,7 @@ export async function markWrong(code: string): Promise<void> {
   if (room.phase !== 'acting') return
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     phase: 'stealing',
-    phaseEndsAt: Date.now() + WK_STEAL_SECONDS * 1000,
+    phaseEndsAt: serverNow() + WK_STEAL_SECONDS * 1000,
     'activePowerUps/double': false,
   })
 }
@@ -463,7 +473,6 @@ export async function useJoker(code: string): Promise<JokerOutcome | null> {
     joker: { outcome, ts: Date.now() },
   }
   if (outcome === 'addPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) + 1
-  else if (outcome === 'deductPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) - 1
   await update(ref(rtdb, `${ROOMS}/${code}`), patch)
   return outcome
 }
@@ -626,10 +635,10 @@ export async function togglePause(code: string): Promise<void> {
   const room = snap.val() as WalaKelmaRoom
   if (room.paused) {
     const remaining = room.pausedRemainingMs ?? 0
-    await update(ref(rtdb, `${ROOMS}/${code}`), { paused: false, pausedRemainingMs: null, phaseEndsAt: Date.now() + remaining })
+    await update(ref(rtdb, `${ROOMS}/${code}`), { paused: false, pausedRemainingMs: null, phaseEndsAt: serverNow() + remaining })
   } else {
     if (room.phaseEndsAt == null) return
-    const remaining = Math.max(0, room.phaseEndsAt - Date.now())
+    const remaining = Math.max(0, room.phaseEndsAt - serverNow())
     await update(ref(rtdb, `${ROOMS}/${code}`), { paused: true, pausedRemainingMs: remaining })
   }
 }
@@ -645,7 +654,7 @@ export async function resetPhaseTimer(code: string): Promise<void> {
   else if (room.phase === 'stealing') seconds = WK_STEAL_SECONDS
   else return
   await update(ref(rtdb, `${ROOMS}/${code}`), {
-    phaseEndsAt: Date.now() + seconds * 1000,
+    phaseEndsAt: serverNow() + seconds * 1000,
     paused: false,
     pausedRemainingMs: null,
   })

@@ -9,7 +9,7 @@ import { getCustomWorksCount, CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@
 import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
-  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, useJoker, togglePause, resetPhaseTimer,
+  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, togglePause, resetPhaseTimer,
   toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, getBestActor,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
@@ -149,7 +149,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
         <Card>
           <SectionTitle>الفئات (حتى {WK_MAX_CATEGORIES}) — مختار: {selected.length}</SectionTitle>
           {cats.length === 0 && <Muted>لا توجد فئات بعد — أضفها من لوحة الإدارة.</Muted>}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 10, marginTop: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginTop: 10 }}>
             {cats.map(c => <CategoryCard key={c.id} name={c.name} imageUrl={c.imageUrl} selected={selected.includes(c.id)} onClick={() => toggleCat(c.id)} />)}
             {customCount > 0 && (
               <CategoryCard name={`${CUSTOM_CATEGORY_NAME} (${customCount})`} selected={selected.includes(CUSTOM_CATEGORY_ID)} onClick={() => toggleCat(CUSTOM_CATEGORY_ID)} />
@@ -248,11 +248,11 @@ function CategoryCard({ name, imageUrl, selected, onClick }: { name: string; ima
       transition: 'all 0.15s',
     }}>
       {imageUrl ? (
-        <img src={imageUrl} alt={name} width={72} height={72} style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover' }} />
+        <img src={imageUrl} alt={name} style={{ width: '100%', aspectRatio: '1', borderRadius: 12, objectFit: 'cover' }} />
       ) : (
-        <div style={{ width: 72, height: 72, borderRadius: 12, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🎭</div>
+        <div style={{ width: '100%', aspectRatio: '1', borderRadius: 12, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎭</div>
       )}
-      <span style={{ fontSize: 11.5, fontWeight: 800, color: selected ? C.red : `${C.ink}99`, textAlign: 'center', lineHeight: 1.3 }}>{name}</span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: selected ? C.red : `${C.ink}99`, textAlign: 'center', lineHeight: 1.3 }}>{name}</span>
     </button>
   )
 }
@@ -400,14 +400,19 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {WK_POWERUPS.filter(p => p.preTurn).map(p => {
                   const used = room.powerUpsUsed[team][p.id]
-                  const active = room.activePowerUps[p.id as 'double' | 'deduct' | 'silence']
+                  const active = room.activePowerUps[p.id as 'double' | 'silence']
                   return (
-                    <button key={p.id} disabled={used}
-                      onClick={() => { if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double' | 'deduct') }}
-                      style={powerBtn(p.color, active, used)}>
-                      <span>{p.icon} {p.name}</span>
-                      <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور ✓' : used ? 'استُخدمت' : p.desc}</span>
-                    </button>
+                    <div key={p.id} style={{ display: 'flex', gap: 6 }}>
+                      <button disabled={used && !active} style={{ ...powerBtn(p.color, active, used), flex: 1 }}
+                        onClick={() => { if (used) return; if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double') }}>
+                        <span>{p.icon} {p.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور ✓' : used ? 'استُخدمت' : p.desc}</span>
+                      </button>
+                      {active && (
+                        <button onClick={() => { deactivatePowerUp(room.code, team, p.id as 'double' | 'silence'); setSilencePick(false) }}
+                          style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -439,13 +444,13 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <button onClick={() => toggleQuestionHidden(room.code, !room.questionHidden)} style={ghostBtn}>{room.questionHidden ? '👁 إظهار' : '🙈 إخفاء'}</button>
             </div>
             {!room.questionHidden ? (
-              <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
-                {w.posterUrl ? <img src={w.posterUrl} alt="" width={84} style={{ borderRadius: 12, objectFit: 'cover' }} /> : <div style={{ width: 84, height: 116, borderRadius: 12, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🎬</div>}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 20, fontWeight: 900 }}>{w.title}</div>
-                  <div style={{ fontSize: 12, color: `${C.ink}99`, marginTop: 4 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
-                  {w.actors?.length > 0 && <div style={{ fontSize: 12, color: `${C.ink}99`, marginTop: 2 }}>👤 {w.actors.join('، ')}</div>}
-                  {w.extraInfo && <div style={{ fontSize: 12, color: `${C.ink}aa`, marginTop: 4 }}>{w.extraInfo}</div>}
+              <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+                {w.posterUrl ? <img src={w.posterUrl} alt="" width={120} style={{ borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 120, height: 165, borderRadius: 14, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, flexShrink: 0 }}>🎬</div>}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.2 }}>{w.title}</div>
+                  <div style={{ fontSize: 13, color: `${C.ink}99`, marginTop: 6 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
+                  {w.actors?.length > 0 && <div style={{ fontSize: 13, color: `${C.ink}99`, marginTop: 3 }}>👤 {w.actors.join('، ')}</div>}
+                  {w.extraInfo && <div style={{ fontSize: 13, color: `${C.ink}aa`, marginTop: 5 }}>{w.extraInfo}</div>}
                 </div>
               </div>
             ) : <div style={{ padding: 20, textAlign: 'center', color: `${C.ink}66` }}>العمل مخفي</div>}
@@ -474,7 +479,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
             <button onClick={() => togglePause(room.code)} style={{ ...ghostBtn, flex: 1 }}>{room.paused ? '▶️ استئناف' : '⏸ إيقاف'}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>🔄 إعادة الوقت</button>
           </div>
-          {room.joker && <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}</div>}
+          {room.joker && <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : 'إعادة تمثيل بعمل جديد'}</div>}
           <SkipCancelRow room={room} />
         </>
       )}
@@ -573,7 +578,7 @@ function Input({ value, onChange, placeholder, accent }: { value: string; onChan
 }
 
 const inputStyle = (accent?: string): React.CSSProperties => ({ width: '100%', padding: '11px 12px', borderRadius: 12, border: `1px solid ${accent ? accent + '55' : C.ink + '20'}`, fontSize: 14, color: C.ink, background: C.cream, outline: 'none', marginBottom: 8 })
-const primaryBtn: React.CSSProperties = { width: '100%', padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 16, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
+const primaryBtn: React.CSSProperties = { width: '100%', padding: '22px 15px', borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 18, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
 const successBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: '#27AE78', cursor: 'pointer', boxShadow: '0 10px 24px #27AE7833' }
 const dangerBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: C.red, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
 const ghostBtn: React.CSSProperties = { padding: '9px 12px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13, cursor: 'pointer' }

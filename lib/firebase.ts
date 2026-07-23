@@ -1,7 +1,7 @@
 // تهيئة Firebase لمشروع "ولا كلمة" المستقل — Firestore (المحتوى) + Realtime Database (تزامن الغرف)
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
-import { getDatabase } from 'firebase/database'
+import { getDatabase, ref, onValue } from 'firebase/database'
 import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -30,4 +30,17 @@ function makeFirestore() {
 export const db = makeFirestore()       // Firestore — الأعمال والفئات
 export const rtdb = getDatabase(app)    // Realtime Database — غرف المباريات
 export const auth = getAuth(app)
+
+// فرق الساعة بين جهاز المستخدم وساعة سيرفر Firebase — يخلي المؤقّت متزامن فعلياً
+// بين شاشة المقدم وشاشة العرض حتى لو ساعة أحد الجهازين غير مضبوطة
+let serverTimeOffsetMs = 0
+if (typeof window !== 'undefined') {
+  onValue(ref(rtdb, '.info/serverTimeOffset'), snap => {
+    serverTimeOffsetMs = (snap.val() as number) || 0
+  })
+}
+export function serverNow(): number {
+  return Date.now() + serverTimeOffsetMs
+}
+
 export default app

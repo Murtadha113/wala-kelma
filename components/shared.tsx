@@ -6,6 +6,7 @@ import {
   WalaKelmaRoom, TeamId, WKPhase,
   beginActing,
 } from '@/lib/wala-kelma'
+import { serverNow } from '@/lib/firebase'
 import { WK_COLORS, WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_POWERUPS } from '@/lib/wala-kelma-content'
 import { playCorrectSound, playWrongSound, playWinSound, playTickSound } from '@/lib/sound'
 
@@ -41,7 +42,7 @@ export function useWalaKelmaCountdown(room: WalaKelmaRoom | null, isHost: boolea
     const compute = () => {
       if (room.paused) return Math.ceil((room.pausedRemainingMs ?? 0) / 1000)
       if (room.phaseEndsAt == null) return 0
-      return Math.max(0, Math.ceil((room.phaseEndsAt - Date.now()) / 1000))
+      return Math.max(0, Math.ceil((room.phaseEndsAt - serverNow()) / 1000))
     }
 
     const tick = () => {

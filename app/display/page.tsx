@@ -220,7 +220,7 @@ function DisplayInner() {
 
         {room.joker && (room.phase === 'acting' || room.phase === 'reading') && (
           <div style={{ fontSize: 20, fontWeight: 800, color: C.orange, background: `${C.orange}18`, padding: '8px 16px', borderRadius: 999 }}>
-            🃏 الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
+            🃏 الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : 'إعادة تمثيل بعمل جديد'}
           </div>
         )}
       </div>
