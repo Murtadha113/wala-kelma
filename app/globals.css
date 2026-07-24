@@ -21,3 +21,57 @@ input { font-family: inherit; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 8px; }
+
+/* تفاعل عام لكل الأزرار — بس على أجهزة فيها ماوس فعلي، مو شاشات لمس (جوال المقدّم) */
+@media (hover: hover) {
+  button:not(:disabled) { transition: transform 0.15s ease, filter 0.15s ease; }
+  button:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.05); }
+  button:not(:disabled):active { transform: scale(0.96); filter: brightness(0.98); }
+}
+button:disabled { cursor: not-allowed; }
+button:focus-visible, input:focus-visible {
+  outline: 2px solid #582EF4;
+  outline-offset: 2px;
+}
+input:focus {
+  box-shadow: 0 0 0 4px rgba(88, 46, 244, 0.16);
+  border-color: #582EF4 !important;
+}
+
+@keyframes wkPopIn {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.wk-pop-in { animation: wkPopIn 0.4s cubic-bezier(.34,1.56,.64,1); }
+
+@keyframes wkSlideUpFade {
+  0% { transform: translateY(18px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.wk-slide-up { animation: wkSlideUpFade 0.35s ease-out; }
+
+@keyframes wkBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--wk-glow, rgba(218,35,66,0.45)); }
+  50% { box-shadow: 0 0 0 10px transparent; }
+}
+.wk-breathe { animation: wkBreathe 1.8s ease-in-out infinite; }
+
+@keyframes wkFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.wk-float { animation: wkFloat 2.6s ease-in-out infinite; }
+
+@keyframes wkTapPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.wk-tap-pulse { animation: wkTapPulse 0.25s ease-out; }
+
+@keyframes wkCopiedPulse {
+  0% { box-shadow: 0 0 0 0 rgba(39, 174, 120, 0.5); }
+  100% { box-shadow: 0 0 0 12px rgba(39, 174, 120, 0); }
+}
+.wk-copied-pulse { animation: wkCopiedPulse 0.6s ease-out; }

@@ -1,14 +1,14 @@
 'use client'
 
 // مكونات مشتركة للعبة "ولا كلمة" — المؤقّت المتزامن + عناصر العرض
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   WalaKelmaRoom, TeamId, WKPhase,
-  beginActing,
+  beginActing, onStealTimeUp,
 } from '@/lib/wala-kelma'
 import { serverNow } from '@/lib/firebase'
 import { WK_COLORS, WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_POWERUPS } from '@/lib/wala-kelma-content'
-import { playCorrectSound, playWrongSound, playWinSound, playTickSound } from '@/lib/sound'
+import { playCorrectSound, playWrongSound, playWinSound, playStealSound, playTickSound } from '@/lib/sound'
 
 const C = WK_COLORS
 
@@ -39,27 +39,40 @@ export function useWalaKelmaCountdown(room: WalaKelmaRoom | null, isHost: boolea
     const timed = room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing'
     if (!timed) { setTimeLeft(0); return }
 
-    const compute = () => {
-      if (room.paused) return Math.ceil((room.pausedRemainingMs ?? 0) / 1000)
+    // بدون تقييد عند الصفر — نحتاجها نكتشف "تجاوزنا الصفر بـ3 ثواني" لإنهاء السرقة تلقائياً
+    const computeRaw = () => {
+      if (room.paused) return room.pausedRemainingMs ?? 0
       if (room.phaseEndsAt == null) return 0
-      return Math.max(0, Math.ceil((room.phaseEndsAt - serverNow()) / 1000))
+      return room.phaseEndsAt - serverNow()
     }
 
     const tick = () => {
-      const left = compute()
+      const rawMs = computeRaw()
+      const left = Math.max(0, Math.ceil(rawMs / 1000))
       setTimeLeft(left)
-      if (!muted && !room.paused && left <= 10 && left > 0 && left !== lastTickRef.current) {
+      if (!muted && !room.paused && left <= 3 && left > 0 && left !== lastTickRef.current) {
+        lastTickRef.current = left
+        playTickSound(left as 1 | 2 | 3)
+      } else if (!muted && !room.paused && left <= 10 && left > 3 && left !== lastTickRef.current) {
         lastTickRef.current = left
         playTickSound()
       }
       // القراءة تنتقل تلقائياً لوقت التمثيل (ما فيها قرار يحتاج المقدم).
-      // لكن نهاية وقت التمثيل/السرقة تحتاج قرار المقدم (صح/غلط/سرقة) — ما ننقل المرحلة تلقائياً،
+      // لكن نهاية وقت التمثيل تحتاج قرار المقدم (صح/غلط) — ما ننقل المرحلة تلقائياً،
       // فقط نجمّد العدّاد عند صفر وننتظر ضغطة المقدم على الزر المناسب.
       if (isHost && !room.paused && room.phaseEndsAt != null && left <= 0 && room.phase === 'reading') {
         const key = `${room.phase}_${room.phaseEndsAt}`
         if (firedRef.current !== key) {
           firedRef.current = key
           beginActing(room.code)
+        }
+      }
+      // بعد نهاية وقت السرقة عملياً محسوم — نمهل 3 ثواني (لو المقدم يبي يضغط بنفسه) ثم ننهيها تلقائياً
+      if (isHost && !room.paused && room.phaseEndsAt != null && room.phase === 'stealing' && rawMs <= -3000) {
+        const key = `steal_${room.phaseEndsAt}`
+        if (firedRef.current !== key) {
+          firedRef.current = key
+          onStealTimeUp(room.code)
         }
       }
     }
@@ -97,7 +110,9 @@ export function TimerRing({ timeLeft, total, danger }: { timeLeft: number; total
   const mm = Math.floor(timeLeft / 60)
   const ss = timeLeft % 60
   return (
-    <div style={{ position: 'relative', width: 200, height: 200 }}>
+    <div style={{ position: 'relative', width: 200, height: 200,
+      filter: critical ? `drop-shadow(0 0 ${6 + (10 - timeLeft) * 1.4}px ${C.red}aa)` : undefined,
+      transition: 'filter 0.3s' }}>
       <svg width={200} height={200} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={100} cy={100} r={R} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={14} />
         <circle cx={100} cy={100} r={R} fill="none" stroke={color} strokeWidth={14} strokeLinecap="round"
@@ -127,11 +142,19 @@ export function ScoreBoard({ room, size = 'md' }: { room: WalaKelmaRoom; size?: 
         boxShadow: active ? `0 10px 26px ${color}22` : 'none',
       }}>
         <div style={{ fontSize: label, fontWeight: 800, color: C.ink, marginBottom: 4 }}>{room.teams[id].name}</div>
-        <div style={{ fontSize: font, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{room.teams[id].score}</div>
+        <div key={room.teams[id].score} className="wk-score-bounce"
+          style={{ fontSize: font, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          {room.teams[id].score}
+        </div>
       </div>
     )
   }
-  return <div style={{ display: 'flex', gap: 10, direction: 'rtl' }}>{cell('A', C.violet)}{cell('B', C.red)}</div>
+  return (
+    <div style={{ display: 'flex', gap: 10, direction: 'rtl' }}>
+      {cell('A', C.violet)}{cell('B', C.red)}
+      <style>{`@keyframes wkScoreBounce{0%{transform:scale(0.5);opacity:0.4}55%{transform:scale(1.22)}100%{transform:scale(1);opacity:1}}.wk-score-bounce{animation:wkScoreBounce 0.4s cubic-bezier(.34,1.56,.64,1)}`}</style>
+    </div>
+  )
 }
 
 export function PowerUpsGrid({ room, teamId }: { room: WalaKelmaRoom; teamId: TeamId }) {
@@ -166,7 +189,8 @@ export function useResultSounds(room: WalaKelmaRoom | null, muted = false) {
     if (room.lastResult && room.lastResult.ts !== lastRef.current) {
       lastRef.current = room.lastResult.ts
       if (!muted) {
-        if (room.lastResult.type === 'correct' || room.lastResult.type === 'steal') playCorrectSound()
+        if (room.lastResult.type === 'correct') playCorrectSound()
+        else if (room.lastResult.type === 'steal') playStealSound()
         else if (room.lastResult.type === 'timeout') playWrongSound()
       }
     }
@@ -190,6 +214,38 @@ export function useWakeLock(enabled: boolean) {
       sentinel?.release().catch(() => {})
     }
   }, [enabled])
+}
+
+const CONFETTI_COLORS = [C.red, C.orange, C.violet, '#27AE78', '#FFD166']
+
+// كونفيتي CSS خالص بدون أي مكتبة — قطع ملونة تسقط وتدور. count صغير (10) للحظة إجابة صح، وأكبر لشاشة الفوز
+export function Confetti({ count = 60, active = true }: { count?: number; active?: boolean }) {
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const pieces = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    left: Math.random() * 100,
+    delay: Math.random() * 0.5,
+    duration: 2 + Math.random() * 1.6,
+    rotate: Math.round(Math.random() * 360),
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    w: 6 + Math.random() * 5,
+    drift: Math.round((Math.random() - 0.5) * 140),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  })), [count, active])
+  if (!active || reduced) return null
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 60 }} aria-hidden>
+      {pieces.map((p, i) => (
+        <span key={i} style={{
+          position: 'absolute', top: -20, left: `${p.left}%`, width: p.w, height: p.w * 1.7,
+          background: p.color, borderRadius: 2,
+          animation: `wkConfettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          ['--wk-drift' as string]: `${p.drift}px`,
+          transform: `rotate(${p.rotate}deg)`,
+        } as React.CSSProperties} />
+      ))}
+      <style>{`@keyframes wkConfettiFall{0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1}100%{transform:translateY(105vh) translateX(var(--wk-drift)) rotate(620deg);opacity:0.85}}`}</style>
+    </div>
+  )
 }
 
 export function toggleFullscreen() {

@@ -693,6 +693,21 @@ export async function adjustScore(code: string, teamId: TeamId, delta: number): 
 }
 
 export async function skipTurn(code: string): Promise<void> {
+  const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
+  if (!snap.exists()) return
+  const room = snap.val() as WalaKelmaRoom
+  // تخطّي قبل سحب أي عمل (بمرحلة idle) — ينتقل للاعب التالي مباشرة بدون احتساب سؤال من الجولة
+  if (room.phase === 'idle') {
+    if (room.turnOrder.length === 0) return
+    const nextIndex = (room.currentTurnIndex + 1) % room.turnOrder.length
+    await update(ref(rtdb, `${ROOMS}/${code}`), {
+      currentTurnIndex: nextIndex,
+      activeTeam: room.turnOrder[nextIndex].team,
+      activePowerUps: { ...EMPTY_POWERUPS },
+      silencedPlayerId: null,
+    })
+    return
+  }
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     phase: 'resolved', phaseEndsAt: null,
     lastResult: { team: null, type: 'timeout', points: 0, ts: Date.now() },

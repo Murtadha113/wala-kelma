@@ -1,15 +1,17 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { subscribeToWalaKelmaRoom, WalaKelmaRoom, TeamId, getBestActor } from '@/lib/wala-kelma'
 import { getCategories, type WKCategory } from '@/lib/works'
 import { CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@/lib/custom-works'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { serverNow } from '@/lib/firebase'
 import {
   useWalaKelmaCountdown, useResultSounds, phaseTotal, PHASE_LABEL,
-  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs,
+  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs, Confetti,
 } from '@/components/shared'
+import { playDrumRollSound, playWinSound } from '@/lib/sound'
 import { Logo } from '@/components/logo'
 
 const C = WK_COLORS
@@ -22,6 +24,9 @@ function DisplayInner() {
   const [notFound, setNotFound] = useState(false)
   const [muted, setMuted] = useState(false)
   const [cats, setCats] = useState<WKCategory[]>([])
+  const [hostAway, setHostAway] = useState(false)
+  const [tiebreakBanner, setTiebreakBanner] = useState(false)
+  const wasTiebreak = useRef(false)
 
   useEffect(() => {
     if (!code) { router.replace('/'); return }
@@ -38,6 +43,28 @@ function DisplayInner() {
   const timeLeft = useWalaKelmaCountdown(room, false, muted)
   useResultSounds(room, muted)
   useWakeLock(!!room && room.status !== 'finished')
+
+  // انقطاع المقدّم — لو آخر نبضة قلب تجاوزت 15 ثانية نعرض تنبيه بدل ما نتجمّد بصمت
+  useEffect(() => {
+    if (!room || room.status !== 'playing') { setHostAway(false); return }
+    const check = () => setHostAway(!!room.hostLastSeen && serverNow() - room.hostLastSeen > 15000)
+    check()
+    const t = setInterval(check, 3000)
+    return () => clearInterval(t)
+  }, [room?.hostLastSeen, room?.status])
+
+  // دخول الجولة الفاصلة — إعلان مرئي مؤقت بدل تبديل نص هادئ
+  useEffect(() => {
+    if (!room?.isTiebreak) { wasTiebreak.current = false; return }
+    // ملاحظة: ما نوقف الجدولة بحارس wasTiebreak — بس نمنع تكرار الصوت/الإعلان وقت الإعادة المزدوجة بوضع React Strict
+    if (!wasTiebreak.current) {
+      wasTiebreak.current = true
+      setTiebreakBanner(true)
+      if (!muted) playWinSound()
+    }
+    const t = setTimeout(() => setTiebreakBanner(false), 2600)
+    return () => clearTimeout(t)
+  }, [room?.isTiebreak, muted])
 
   if (notFound) {
     return <Center><div style={{ textAlign: 'center' }}>
@@ -66,103 +93,68 @@ function DisplayInner() {
   }
 
   if (room.status === 'draw') {
-    const slot = room.turnOrder[room.currentTurnIndex]
-    const catInfo = (id: string) => id === CUSTOM_CATEGORY_ID
-      ? { name: CUSTOM_CATEGORY_NAME, imageUrl: undefined as string | undefined }
-      : { name: cats.find(c => c.id === id)?.name || id, imageUrl: cats.find(c => c.id === id)?.imageUrl }
-
-    const drawColor = room.activeTeam === 'A' ? C.violet : C.red
-
-    return (
-      <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -140, right: -100, width: 380, height: 380, borderRadius: '50%', background: `${C.orange}22`, filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', top: 200, left: -120, width: 320, height: 320, borderRadius: '50%', background: `${C.violet}1c`, filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', bottom: -100, right: '30%', width: 260, height: 260, borderRadius: '50%', background: `${C.red}14`, filter: 'blur(60px)' }} />
-
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(20px,4vw,48px)', gap: 24 }}>
-          <Logo height={64} priority />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: C.ink }}>{room.matchName || 'مباراة'}</div>
-            <div style={{ fontSize: 13, color: `${C.ink}66`, letterSpacing: '0.2em', marginTop: 2, background: '#fff', display: 'inline-block', padding: '3px 12px', borderRadius: 999, border: `1px solid ${C.ink}12` }}>{room.code}</div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 720 }}>
-            {(['A', 'B'] as TeamId[]).map(id => {
-              const tc = id === 'A' ? C.violet : C.red
-              return (
-                <div key={id} style={{
-                  flex: '1 1 260px', background: '#fff', borderRadius: 22, padding: 22,
-                  border: `2px solid ${tc}2a`, boxShadow: `0 10px 30px ${tc}14`,
-                }}>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 12 }}>{room.teams[id].name}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {room.teams[id].players.map(p => (
-                      <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink, textAlign: 'center', background: `${tc}0d`, borderRadius: 10, padding: '8px 10px' }}>{p.name}</div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div style={{ width: '100%', maxWidth: 720 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}77`, textAlign: 'center', marginBottom: 10 }}>الفئات المختارة</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-              {room.categories.map(id => {
-                const info = catInfo(id)
-                return (
-                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 16, padding: '8px 16px 8px 8px', border: `1px solid ${C.ink}12`, boxShadow: `0 4px 14px ${C.ink}0a` }}>
-                    {info.imageUrl
-                      ? <img src={info.imageUrl} alt={info.name} width={44} height={44} style={{ borderRadius: 10, objectFit: 'cover' }} />
-                      : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎭</div>}
-                    <span style={{ fontSize: 14, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div style={{
-            marginTop: 8, textAlign: 'center', width: '100%', maxWidth: 420, borderRadius: 24, padding: '22px 24px',
-            background: `linear-gradient(135deg, ${drawColor}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
-            color: '#fff', boxShadow: `0 14px 36px ${drawColor}33`,
-          }}>
-            <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>القرعة 🎲 — الفريق البادئ</div>
-            <div style={{ fontSize: 34, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
-            {slot && <div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
-          </div>
-        </div>
-      </div>
-    )
+    return <DisplayDrawScreen room={room} cats={cats} />
   }
 
   if (room.status === 'finished') {
     const win = room.winner
     const bestActor = getBestActor(room)
-    return <Center><div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 26, fontWeight: 800, color: `${C.ink}aa` }}>انتهت المباراة</div>
-      <div style={{ fontSize: 72, marginTop: 8 }}>🏆</div>
-      <div style={{ fontSize: 44, fontWeight: 900, marginTop: 8, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>
-        {win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}
-      </div>
-      <div style={{ marginTop: 28, width: 360, maxWidth: '86vw' }}><ScoreBoard room={room} size="lg" /></div>
-      {bestActor && (
-        <div style={{ marginTop: 20, display: 'inline-block', background: `${C.orange}14`, borderRadius: 14, padding: '10px 24px', border: `1px solid ${C.orange}22`, boxShadow: `0 10px 26px ${C.orange}1c` }}>
-          <span style={{ fontSize: 15, color: `${C.ink}88`, fontWeight: 700 }}>🎭 أفضل ممثل: </span>
-          <span style={{ fontSize: 20, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
+    return <Center>
+      <Confetti count={90} active={win !== 'draw'} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 26, fontWeight: 800, color: `${C.ink}aa` }}>انتهت المباراة</div>
+        <div className="wk-float" style={{ fontSize: 72, marginTop: 8 }}>🏆</div>
+        <div className="wk-pop-in" style={{ fontSize: 44, fontWeight: 900, marginTop: 8, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>
+          {win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}
         </div>
-      )}
-    </div></Center>
+        <div style={{ marginTop: 28, width: 360, maxWidth: '86vw' }}><ScoreBoard room={room} size="lg" /></div>
+        {bestActor && (
+          <div style={{ marginTop: 20, display: 'inline-block', background: `${C.orange}14`, borderRadius: 14, padding: '10px 24px', border: `1px solid ${C.orange}22`, boxShadow: `0 10px 26px ${C.orange}1c` }}>
+            <span style={{ fontSize: 15, color: `${C.ink}88`, fontWeight: 700 }}>🎭 أفضل ممثل: </span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
+          </div>
+        )}
+      </div>
+    </Center>
   }
 
   const slot = room.turnOrder[room.currentTurnIndex]
+  const nextSlot = room.turnOrder.length > 1 ? room.turnOrder[(room.currentTurnIndex + 1) % room.turnOrder.length] : null
   const activeColor = room.activeTeam === 'A' ? C.violet : C.red
   const timed = room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing'
   const stealing = room.phase === 'stealing'
+  const silencedName = room.silencedPlayerId
+    ? [...room.teams.A.players, ...room.teams.B.players].find(p => p.id === room.silencedPlayerId)?.name
+    : null
 
   return (
-    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)', position: 'relative', overflow: 'hidden' }}>
+    <div dir="rtl" style={{
+      minHeight: '100dvh', background: stealing ? `linear-gradient(${C.cream}, ${C.red}0d)` : C.cream,
+      display: 'flex', flexDirection: 'column', padding: '24px clamp(16px,4vw,48px)', position: 'relative', overflow: 'hidden',
+      transition: 'background 0.4s',
+    }}>
       <GradientBlobs />
+      {hostAway && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 90, flexDirection: 'column', gap: 12 }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', border: `4px solid ${C.orange}55`, borderTopColor: C.orange, animation: 'wkspin 0.8s linear infinite' }} />
+          <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>بانتظار المقدّم...</div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>يبدو إن اتصال المقدّم انقطع</div>
+        </div>
+      )}
+      {tiebreakBanner && (
+        <div style={{ position: 'fixed', inset: 0, background: `linear-gradient(135deg, ${C.violet}, ${C.red})`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 95 }}>
+          <div className="wk-pop-in" style={{ textAlign: 'center', color: '#fff' }}>
+            <div style={{ fontSize: 60 }}>⚡</div>
+            <div style={{ fontSize: 40, fontWeight: 900, marginTop: 10 }}>الجولة الفاصلة!</div>
+          </div>
+        </div>
+      )}
+      {room.paused && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.68)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40, flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 64 }}>⏸</div>
+          <div style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>إيقاف مؤقت</div>
+        </div>
+      )}
       <div style={{ position: 'fixed', top: 10, left: 10, display: 'flex', gap: 6, zIndex: 30 }}>
         <button onClick={() => setMuted(m => !m)} title={muted ? 'تشغيل الصوت' : 'كتم الصوت'}
           style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.ink}18`, background: '#fff', cursor: 'pointer', fontSize: 15 }}>
@@ -185,28 +177,36 @@ function DisplayInner() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-        {stealing && <div style={{ fontSize: 30, fontWeight: 900, color: C.red, animation: 'wkflash 0.6s infinite' }}>⚡ فرصة سرقة — {room.teams[room.activeTeam === 'A' ? 'B' : 'A'].name}!</div>}
+        {stealing && (
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ position: 'absolute', top: -20, width: 140, height: 140, borderRadius: '50%', animation: 'wkStealPulse 1s ease-out infinite' }} />
+            <div style={{ fontSize: 30, fontWeight: 900, color: C.red, animation: 'wkflash 0.6s infinite' }}>⚡ فرصة سرقة — {room.teams[room.activeTeam === 'A' ? 'B' : 'A'].name}!</div>
+          </div>
+        )}
         {!stealing && <>
           <div style={{ fontSize: 20, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 40, fontWeight: 900, color: activeColor }}>{room.teams[room.activeTeam].name}</div>
           {slot && <div style={{ fontSize: 24, fontWeight: 700, color: C.ink }}>يمثّل الآن: {slot.playerName}</div>}
+          {nextSlot && (room.phase === 'idle' || room.phase === 'reading' || room.phase === 'acting') && (
+            <div style={{ fontSize: 13, color: `${C.ink}66`, fontWeight: 700 }}>التالي: {nextSlot.playerName}</div>
+          )}
         </>}
-        {room.silencedPlayerId && (room.phase === 'acting' || room.phase === 'stealing') && (
-          <div style={{ fontSize: 16, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 14px', borderRadius: 999 }}>🤫 لاعب مُسكت هذا الدور</div>
+        {silencedName && (room.phase === 'acting' || room.phase === 'stealing') && (
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.violet, background: `${C.violet}14`, padding: '6px 14px', borderRadius: 999 }}>🤫 {silencedName} مُسكت هذا الدور</div>
         )}
 
         {timed && <TimerRing timeLeft={timeLeft} total={phaseTotal(room)} danger={room.phase === 'stealing'} />}
-        {room.paused && <div style={{ fontSize: 18, fontWeight: 800, color: C.orange }}>⏸ إيقاف مؤقت</div>}
 
         {room.phase === 'resolved' && room.lastResult && (
           <>
-            <div style={{ fontSize: 30, fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : `${C.ink}88` }}>
+            <Confetti key={room.lastResult.ts} count={14} active={room.lastResult.points > 0} />
+            <div key={room.lastResult.ts} className="wk-pop-in" style={{ fontSize: 30, fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : `${C.ink}88` }}>
               {room.lastResult.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'steal' && `🥷 سرقة! نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
             </div>
             {room.currentWork && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 18, padding: 14, border: `1px solid ${C.ink}12`, boxShadow: `0 12px 30px ${C.ink}12` }}>
+              <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 18, padding: 14, border: `1px solid ${C.ink}12`, boxShadow: `0 12px 30px ${C.ink}12` }}>
                 {room.currentWork.posterUrl && <img src={room.currentWork.posterUrl} alt="" width={64} style={{ borderRadius: 10, objectFit: 'cover' }} />}
                 <div>
                   <div style={{ fontSize: 12, color: `${C.ink}77`, fontWeight: 700 }}>الإجابة الصحيحة</div>
@@ -216,7 +216,7 @@ function DisplayInner() {
             )}
           </>
         )}
-        {room.phase === 'roundEnd' && <div style={{ fontSize: 30, fontWeight: 900, color: C.orange }}>انتهت الجولة 🎬</div>}
+        {room.phase === 'roundEnd' && <DisplayRoundEndSummary room={room} />}
 
         {room.joker && (room.phase === 'acting' || room.phase === 'reading') && (
           <div style={{ fontSize: 20, fontWeight: 800, color: C.orange, background: `${C.orange}18`, padding: '8px 16px', borderRadius: 999 }}>
@@ -232,7 +232,127 @@ function DisplayInner() {
           <div style={{ flex: 1 }}><PowerUpsGrid room={room} teamId="B" /></div>
         </div>
       </div>
-      <style>{`@keyframes wkflash{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+      <style>{`
+        @keyframes wkflash{0%,100%{opacity:1}50%{opacity:0.5}}
+        @keyframes wkspin{to{transform:rotate(360deg)}}
+        @keyframes wkStealPulse{0%{box-shadow:0 0 0 0 ${C.red}55}100%{box-shadow:0 0 0 60px transparent}}
+      `}</style>
+    </div>
+  )
+}
+
+function DisplayRoundEndSummary({ room }: { room: WalaKelmaRoom }) {
+  const a = room.teams.A.score || 0
+  const b = room.teams.B.score || 0
+  const diff = Math.abs(a - b)
+  const leading = a === b ? null : a > b ? room.teams.A.name : room.teams.B.name
+  return (
+    <div className="wk-pop-in" style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 30, fontWeight: 900, color: C.orange }}>انتهت الجولة {room.currentRound} 🎬</div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+        {(['A', 'B'] as TeamId[]).map(id => (
+          <div key={id} style={{ minWidth: 140, textAlign: 'center', padding: '14px 18px', borderRadius: 16, background: `${(id === 'A' ? C.violet : C.red)}0d`, border: `1px solid ${(id === 'A' ? C.violet : C.red)}22` }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: `${C.ink}99` }}>{room.teams[id].name}</div>
+            <div style={{ fontSize: 40, fontWeight: 900, color: id === 'A' ? C.violet : C.red }}>{room.teams[id].score}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: `${C.ink}88`, marginTop: 14 }}>
+        {leading ? `${leading} متقدّم بـ ${diff} ${diff === 1 ? 'نقطة' : 'نقاط'} 🔥` : 'تعادل حتى الآن 🤝'}
+      </div>
+    </div>
+  )
+}
+
+function DisplayDrawScreen({ room, cats }: { room: WalaKelmaRoom; cats: WKCategory[] }) {
+  const slot = room.turnOrder[room.currentTurnIndex]
+  const catInfo = (id: string) => id === CUSTOM_CATEGORY_ID
+    ? { name: CUSTOM_CATEGORY_NAME, imageUrl: undefined as string | undefined }
+    : { name: cats.find(c => c.id === id)?.name || id, imageUrl: cats.find(c => c.id === id)?.imageUrl }
+
+  const drawColor = room.activeTeam === 'A' ? C.violet : C.red
+  const [revealed, setRevealed] = useState(false)
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    // ملاحظة: ما نوقف الجدولة بحارس firedRef — بس نمنع تكرار الصوت وقت الإعادة المزدوجة بوضع React Strict
+    if (!firedRef.current) { firedRef.current = true; playDrumRollSound() }
+    const t = setTimeout(() => setRevealed(true), 1300)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: -140, right: -100, width: 380, height: 380, borderRadius: '50%', background: `${C.orange}22`, filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', top: 200, left: -120, width: 320, height: 320, borderRadius: '50%', background: `${C.violet}1c`, filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', bottom: -100, right: '30%', width: 260, height: 260, borderRadius: '50%', background: `${C.red}14`, filter: 'blur(60px)' }} />
+
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(20px,4vw,48px)', gap: 24 }}>
+        <Logo height={64} priority />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: C.ink }}>{room.matchName || 'مباراة'}</div>
+          <div style={{ fontSize: 13, color: `${C.ink}66`, letterSpacing: '0.2em', marginTop: 2, background: '#fff', display: 'inline-block', padding: '3px 12px', borderRadius: 999, border: `1px solid ${C.ink}12` }}>{room.code}</div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 720 }}>
+          {(['A', 'B'] as TeamId[]).map((id, i) => {
+            const tc = id === 'A' ? C.violet : C.red
+            return (
+              <div key={id} className="wk-slide-up" style={{
+                flex: '1 1 260px', background: '#fff', borderRadius: 22, padding: 22,
+                border: `2px solid ${tc}2a`, boxShadow: `0 10px 30px ${tc}14`,
+                animationDelay: `${i * 150}ms`, animationFillMode: 'backwards',
+              }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 12 }}>{room.teams[id].name}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {room.teams[id].players.map(p => (
+                    <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink, textAlign: 'center', background: `${tc}0d`, borderRadius: 10, padding: '8px 10px' }}>{p.name}</div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ width: '100%', maxWidth: 720 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}77`, textAlign: 'center', marginBottom: 10 }}>الفئات المختارة</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+            {room.categories.map(id => {
+              const info = catInfo(id)
+              return (
+                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 16, padding: '8px 16px 8px 8px', border: `1px solid ${C.ink}12`, boxShadow: `0 4px 14px ${C.ink}0a` }}>
+                  {info.imageUrl
+                    ? <img src={info.imageUrl} alt={info.name} width={44} height={44} style={{ borderRadius: 10, objectFit: 'cover' }} />
+                    : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.violet}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎭</div>}
+                  <span style={{ fontSize: 14, fontWeight: 800, color: `${C.ink}cc` }}>{info.name}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {!revealed ? (
+          <div style={{
+            marginTop: 8, width: '100%', maxWidth: 420, height: 120, borderRadius: 24,
+            background: `linear-gradient(135deg, ${C.ink}, ${C.ink}dd)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'wkDrawShake 0.25s ease-in-out infinite',
+          }}>
+            <div style={{ fontSize: 40 }}>🎲</div>
+          </div>
+        ) : (
+          <div className="wk-pop-in" style={{
+            marginTop: 8, textAlign: 'center', width: '100%', maxWidth: 420, borderRadius: 24, padding: '22px 24px',
+            background: `linear-gradient(135deg, ${drawColor}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
+            color: '#fff', boxShadow: `0 14px 36px ${drawColor}33`,
+          }}>
+            <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>القرعة 🎲 — الفريق البادئ</div>
+            <div style={{ fontSize: 34, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
+            {slot && <div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes wkDrawShake{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}`}</style>
     </div>
   )
 }

@@ -14,7 +14,8 @@ import {
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
 import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN } from '@/lib/wala-kelma-content'
-import { useWalaKelmaCountdown, useResultSounds, PHASE_LABEL, GradientBlobs } from '@/components/shared'
+import { useWalaKelmaCountdown, useResultSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti } from '@/components/shared'
+import { playDrumRollSound } from '@/lib/sound'
 import { ShareResultButton } from '@/components/share-result'
 import { Logo } from '@/components/logo'
 
@@ -56,6 +57,7 @@ export default function HostPage() {
 
   const timeLeft = useWalaKelmaCountdown(room, true)
   useResultSounds(room)
+  useWakeLock(!!room && room.status !== 'finished')
 
   if (profile === 'loading') return <Loading />
   if (error) return <ErrorScreen msg={error} onBack={() => router.push('/')} />
@@ -93,6 +95,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
   const [quickMode, setQuickMode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [showHelp, setShowHelp] = useState(false)
 
   useEffect(() => { getCategories(true).then(setCats) }, [])
   useEffect(() => { getCustomWorksCount(room.hostId).then(setCustomCount) }, [room.hostId])
@@ -162,7 +165,18 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
       {step === 2 && (
         <>
           <Card>
-            <SectionTitle>بيانات المباراة</SectionTitle>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <SectionTitle style={{ margin: 0 }}>بيانات المباراة</SectionTitle>
+              <button onClick={() => setShowHelp(v => !v)} style={{ ...iconBtn, width: 26, height: 26, fontSize: 13, borderRadius: '50%' }}>؟</button>
+            </div>
+            {showHelp && (
+              <div style={{ background: `${C.violet}0d`, border: `1px solid ${C.violet}22`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 12.5, color: `${C.ink}cc`, lineHeight: 1.8 }}>
+                🎬 <b>القراءة:</b> الممثّل يقرأ العمل لحاله بالوقت المحدد.<br />
+                🎭 <b>التمثيل:</b> يمثّل العمل بالحركات بدون كلام لفريقه.<br />
+                🥷 <b>السرقة:</b> لو الفريق غلط، الفريق الثاني يقدر يخمّن ويسرق النقطة.<br />
+                🃏 <b>الجوكر:</b> نتيجة عشوائية مرة واحدة كل فريق بالمباراة.
+              </div>
+            )}
             <Input value={matchName} onChange={setMatchName} placeholder="اسم المباراة" />
             <div style={{ display: 'flex', gap: 8 }}>
               <Input value={teamAName} onChange={setTeamAName} placeholder="الفريق الأول" accent={C.violet} />
@@ -180,6 +194,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
                 <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
                 <div style={{ height: 12 }} />
                 <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
+                <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
               </>
             )}
 
@@ -200,6 +215,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
                 <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
                 <div style={{ height: 12 }} />
                 <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
+                <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
                 <button onClick={() => setDistributed(false)} style={{ ...ghostBtn, marginTop: 8 }}>🎲 أعد التوزيع</button>
               </>
             )}
@@ -241,8 +257,9 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
 }
 
 function CategoryCard({ name, imageUrl, selected, onClick }: { name: string; imageUrl?: string; selected: boolean; onClick: () => void }) {
+  const [pulse, setPulse] = useState(false)
   return (
-    <button onClick={onClick} style={{
+    <button onClick={() => { onClick(); setPulse(true); setTimeout(() => setPulse(false), 260) }} className={pulse ? 'wk-tap-pulse' : undefined} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 6px 8px', borderRadius: 14, cursor: 'pointer',
       border: `2px solid ${selected ? C.red : C.ink + '14'}`, background: selected ? `${C.red}0d` : '#fff',
       transition: 'all 0.15s',
@@ -270,11 +287,22 @@ function DisplayLinkCard({ code }: { code: string }) {
         <div style={{ flex: 1 }}>
           <Muted>افتح الرابط على شاشة كبيرة، أو امسح الكود.</Muted>
           <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '0.28em', color: C.violet, marginTop: 6 }}>{code}</div>
-          <button onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500) }} style={{ ...ghostBtn, marginTop: 8 }}>{copied ? '✓ تم النسخ' : 'نسخ رابط العرض'}</button>
+          <button onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+            className={copied ? 'wk-copied-pulse' : undefined}
+            style={{ ...ghostBtn, marginTop: 8, ...(copied ? { borderColor: '#27AE78', color: '#27AE78' } : {}) }}>
+            {copied ? '✓ تم النسخ' : 'نسخ رابط العرض'}
+          </button>
         </div>
       </div>
     </Card>
   )
+}
+
+function TeamSizeWarning({ aPlayers, bPlayers }: { aPlayers: string[]; bPlayers: string[] }) {
+  const a = aPlayers.map(s => s.trim()).filter(Boolean).length
+  const b = bPlayers.map(s => s.trim()).filter(Boolean).length
+  if (a === 0 || b === 0 || a === b) return null
+  return <p style={{ fontSize: 11.5, color: `${C.ink}77`, marginTop: 8 }}>⚠️ الفرق مو متساوية بالعدد — لاعبو الفريق الأصغر بيمثّلون أكثر من غيرهم نسبياً.</p>
 }
 
 function PlayersEditor({ label, title, color, players, setPlayers }: { label: string; title?: string; color: string; players: string[]; setPlayers: (p: string[]) => void }) {
@@ -298,19 +326,41 @@ function PlayersEditor({ label, title, color, players, setPlayers }: { label: st
 function DrawScreen({ room }: { room: WalaKelmaRoom }) {
   const slot = room.turnOrder[room.currentTurnIndex]
   const color = room.activeTeam === 'A' ? C.violet : C.red
+  const [revealed, setRevealed] = useState(false)
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    // ملاحظة: ما نوقف الجدولة بحارس firedRef — بس نمنع تكرار الصوت وقت الإعادة المزدوجة بوضع React Strict
+    if (!firedRef.current) { firedRef.current = true; playDrumRollSound() }
+    const t = setTimeout(() => setRevealed(true), 1300)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center', paddingTop: 40, textAlign: 'center' }}>
       <div style={{ fontSize: 22, fontWeight: 800, color: `${C.ink}aa` }}>القرعة 🎲</div>
-      <div style={{
-        width: '100%', maxWidth: 320, borderRadius: 22, padding: '24px 22px',
-        background: `linear-gradient(135deg, ${color}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
-        color: '#fff', boxShadow: `0 16px 40px ${color}33`,
-      }}>
-        <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>الفريق البادئ</div>
-        <div style={{ fontSize: 36, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
-        {slot && <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
-      </div>
-      <button onClick={() => beginPlaying(room.code)} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, maxWidth: 280 }}>يلا نبدأ ←</button>
+      {!revealed ? (
+        <div style={{
+          width: '100%', maxWidth: 320, height: 148, borderRadius: 22,
+          background: `linear-gradient(135deg, ${C.ink}, ${C.ink}dd)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'wkDrawShake 0.25s ease-in-out infinite',
+        }}>
+          <div style={{ fontSize: 40 }}>🎲</div>
+        </div>
+      ) : (
+        <div className="wk-pop-in" style={{
+          width: '100%', maxWidth: 320, borderRadius: 22, padding: '24px 22px',
+          background: `linear-gradient(135deg, ${color}, ${room.activeTeam === 'A' ? '#4726c9' : C.orange})`,
+          color: '#fff', boxShadow: `0 16px 40px ${color}33`,
+        }}>
+          <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>الفريق البادئ</div>
+          <div style={{ fontSize: 36, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
+          {slot && <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
+        </div>
+      )}
+      <button onClick={() => beginPlaying(room.code)} disabled={!revealed} style={{ ...primaryBtn, maxWidth: 280, opacity: revealed ? 1 : 0.4 }}>يلا نبدأ ←</button>
+      <style>{`@keyframes wkDrawShake{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}`}</style>
     </div>
   )
 }
@@ -318,6 +368,7 @@ function DrawScreen({ room }: { room: WalaKelmaRoom }) {
 // ═══════════════ CONTROL PANEL ═══════════════
 function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: number }) {
   const slot = room.turnOrder[room.currentTurnIndex]
+  const nextSlot = room.turnOrder.length > 1 ? room.turnOrder[(room.currentTurnIndex + 1) % room.turnOrder.length] : null
   const team = room.activeTeam
   const other: TeamId = team === 'A' ? 'B' : 'A'
   const color = team === 'A' ? C.violet : C.red
@@ -325,6 +376,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const [turnErr, setTurnErr] = useState('')
   const [cats, setCats] = useState<WKCategory[]>([])
   const [pickedCatId, setPickedCatId] = useState('')
+  const [endConfirm, setEndConfirm] = useState(false)
   const w = room.currentWork
 
   useEffect(() => { getCategories(true).then(setCats) }, [])
@@ -370,6 +422,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           <div style={{ fontSize: 14, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 24, fontWeight: 900, color }}>{room.teams[team].name}</div>
           {slot && <div style={{ fontSize: 16, fontWeight: 700 }}>يمثّل: {slot.playerName}</div>}
+          {nextSlot && <div style={{ fontSize: 12, color: `${C.ink}66`, marginTop: 2 }}>التالي: {nextSlot.playerName}</div>}
           {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && (
             <div style={{ fontSize: 40, fontWeight: 900, color: timeLeft <= 10 ? C.red : color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
               {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
@@ -426,8 +479,8 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               )}
             </Card>
           )}
-          <button onClick={handleStartTurn} style={primaryBtn}>▶️ ابدأ الدور</button>
-          <SkipCancelRow room={room} />
+          <button onClick={handleStartTurn} className="wk-breathe" style={{ ...primaryBtn, ['--wk-glow' as string]: 'rgba(88,46,244,0.45)' } as React.CSSProperties}>▶️ ابدأ الدور</button>
+          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
         </>
       )}
 
@@ -474,27 +527,32 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
           <div style={{ display: 'flex', gap: 8 }}>
             {!room.powerUpsUsed[team].joker && (
-              <button onClick={async () => { const o = await useJoker(room.code); if (o === 'redoWithNewWork') setTimeout(() => startTurn(room.code, room.hostId), 1200) }} style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange }}>🃏 جوكر</button>
+              <button onClick={() => useJoker(room.code)} className="wk-breathe"
+                style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>🃏 جوكر</button>
             )}
             <button onClick={() => togglePause(room.code)} style={{ ...ghostBtn, flex: 1 }}>{room.paused ? '▶️ استئناف' : '⏸ إيقاف'}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>🔄 إعادة الوقت</button>
           </div>
           {room.joker && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <div className="wk-pop-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>
                 🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
               </div>
+              {room.joker.outcome === 'redoWithNewWork' && (
+                <button onClick={() => startTurn(room.code, room.hostId)} style={{ ...ghostBtn, borderColor: '#27AE78', color: '#27AE78' }}>🔁 اسحب العمل الجديد</button>
+              )}
               <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
             </div>
           )}
-          <SkipCancelRow room={room} />
+          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
         </>
       )}
 
       {room.phase === 'resolved' && (
         <>
+          <Confetti key={room.lastResult?.ts} count={12} active={!!room.lastResult && room.lastResult.points > 0} />
           <Card>
-            <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, color: room.lastResult?.points ? '#27AE78' : `${C.ink}88` }}>
+            <div key={room.lastResult?.ts} className="wk-pop-in" style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, color: room.lastResult?.points ? '#27AE78' : `${C.ink}88` }}>
               {room.lastResult?.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'steal' && `🥷 سرقة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
@@ -504,21 +562,66 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         </>
       )}
 
-      {room.phase === 'roundEnd' && (
-        <>
-          <Card><div style={{ textAlign: 'center', fontSize: 22, fontWeight: 900, color: C.orange }}>انتهت الجولة 🎬</div></Card>
-          <button onClick={() => continueAfterRound(room.code)} style={primaryBtn}>ابدأ الجولة التالية ←</button>
-        </>
+      {room.phase === 'roundEnd' && <RoundEndSummary room={room} onContinue={() => continueAfterRound(room.code)} />}
+
+      {endConfirm && (
+        <ConfirmModal
+          title="إنهاء المباراة؟"
+          desc="بتنتهي المباراة الحين بالنتيجة الحالية — ما تقدر ترجع."
+          onCancel={() => setEndConfirm(false)}
+          onConfirm={() => { setEndConfirm(false); cancelMatch(room.code) }}
+        />
       )}
     </div>
   )
 }
 
-function SkipCancelRow({ room }: { room: WalaKelmaRoom }) {
+function RoundEndSummary({ room, onContinue }: { room: WalaKelmaRoom; onContinue: () => void }) {
+  const a = room.teams.A.score || 0
+  const b = room.teams.B.score || 0
+  const diff = Math.abs(a - b)
+  const leading = a === b ? null : a > b ? room.teams.A.name : room.teams.B.name
+  return (
+    <>
+      <Card>
+        <div className="wk-pop-in" style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, color: C.orange, marginBottom: 12 }}>انتهت الجولة {room.currentRound} 🎬</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {(['A', 'B'] as TeamId[]).map(id => (
+            <div key={id} style={{ flex: 1, textAlign: 'center', padding: 12, borderRadius: 14, background: `${(id === 'A' ? C.violet : C.red)}0d`, border: `1px solid ${(id === 'A' ? C.violet : C.red)}22` }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: `${C.ink}99` }}>{room.teams[id].name}</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: id === 'A' ? C.violet : C.red }}>{room.teams[id].score}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginTop: 12 }}>
+          {leading ? `${leading} متقدّم بـ ${diff} ${diff === 1 ? 'نقطة' : 'نقاط'} 🔥` : 'تعادل حتى الآن 🤝'}
+        </div>
+      </Card>
+      <button onClick={onContinue} style={primaryBtn}>ابدأ الجولة التالية ←</button>
+    </>
+  )
+}
+
+function ConfirmModal({ title, desc, onCancel, onConfirm }: { title: string; desc: string; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80, padding: 20 }}>
+      <div className="wk-pop-in" style={{ background: '#fff', borderRadius: 20, padding: 22, maxWidth: 340, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: C.ink, textAlign: 'center' }}>{title}</div>
+        <div style={{ fontSize: 13, color: `${C.ink}99`, textAlign: 'center', marginTop: 8 }}>{desc}</div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button onClick={onCancel} style={{ ...ghostBtn, flex: 1, textAlign: 'center' }}>تراجع</button>
+          <button onClick={onConfirm} style={{ ...dangerBtn, flex: 1 }}>تأكيد</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SkipCancelRow({ room, setEndConfirm }: { room: WalaKelmaRoom; setEndConfirm: (v: boolean) => void }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
       {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'idle') && <button onClick={() => skipTurn(room.code)} style={{ ...ghostBtn, flex: 1 }}>⏭ تخطّي العمل</button>}
-      <button onClick={() => { if (confirm('إنهاء المباراة؟')) cancelMatch(room.code) }} style={{ ...ghostBtn, flex: 1, color: C.red, borderColor: `${C.red}55` }}>🏁 إنهاء</button>
+      <button onClick={() => setEndConfirm(true)} style={{ ...ghostBtn, flex: 1, color: C.red, borderColor: `${C.red}55` }}>🏁 إنهاء</button>
     </div>
   )
 }
@@ -529,8 +632,9 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
   const bestActor = getBestActor(room)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center', paddingTop: 30, textAlign: 'center' }}>
-      <div style={{ fontSize: 64 }}>🏆</div>
-      <div style={{ fontSize: 30, fontWeight: 900, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>{win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}</div>
+      <Confetti count={70} active={win !== 'draw'} />
+      <div className="wk-float" style={{ fontSize: 64 }}>🏆</div>
+      <div className="wk-pop-in" style={{ fontSize: 30, fontWeight: 900, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>{win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}</div>
       <div style={{ display: 'flex', gap: 12, width: '100%' }}>
         {(['A', 'B'] as TeamId[]).map(id => (
           <div key={id} style={{ flex: 1, padding: 16, borderRadius: 16, background: '#fff', border: `1px solid ${(id === 'A' ? C.violet : C.red)}2a`, boxShadow: `0 10px 26px ${(id === 'A' ? C.violet : C.red)}1c` }}>
