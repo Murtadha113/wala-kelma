@@ -7,7 +7,7 @@ import { Logo } from '@/components/logo'
 import { getBanners, type BannerItem } from '@/lib/banners'
 import {
   Clapperboard, Tv, Drama, VolumeX, Zap, Swords,
-  Smartphone, PartyPopper, HelpCircle, X, User, Gamepad2,
+  Smartphone, PartyPopper, HelpCircle, X, User, Gamepad2, ChevronDown,
 } from 'lucide-react'
 
 const C = WK_COLORS
@@ -146,11 +146,18 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <details style={{ background: '#fff', borderRadius: 18, border: `1px solid ${C.ink}14`, overflow: 'hidden' }}>
-              <summary style={{ padding: '14px 18px', fontSize: 13, fontWeight: 800, color: `${C.ink}99`, cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Tv size={15} /> عندك كود مباراة؟ افتح شاشة العرض
+            <details className="wk-code-details wk-breathe" style={{
+              background: `${C.violet}0c`, borderRadius: 18, border: `1.5px solid ${C.violet}33`, overflow: 'hidden',
+              ['--wk-glow' as string]: `${C.violet}40`,
+            } as React.CSSProperties}>
+              <summary style={{ padding: '14px 18px', fontSize: 13, fontWeight: 800, color: C.violet, cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 28, height: 28, borderRadius: '50%', background: `${C.violet}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Tv size={14} />
+                </span>
+                <span style={{ flex: 1 }}>عندك كود مباراة؟ افتح شاشة العرض</span>
+                <ChevronDown size={16} className="wk-chevron" style={{ transition: 'transform 0.25s ease', flexShrink: 0 }} />
               </summary>
-              <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="wk-slide-up" style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <input
                   value={code}
                   onChange={e => setCode(e.target.value.toUpperCase().slice(0, 4))}

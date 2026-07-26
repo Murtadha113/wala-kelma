@@ -81,3 +81,6 @@ input:focus {
   40% { transform: scale(1); opacity: 1; }
 }
 .wk-dot-bounce { animation: wkDotBounce 1.2s ease-in-out infinite; }
+
+.wk-code-details[open] { animation: none; }
+.wk-code-details[open] > summary .wk-chevron { transform: rotate(180deg); }
