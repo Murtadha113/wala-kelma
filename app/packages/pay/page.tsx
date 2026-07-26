@@ -8,6 +8,7 @@ import { getPaymentSettings, submitOrder, type PaymentSettings } from '@/lib/pay
 import { findAndValidateCoupon, computeDiscount, type Coupon } from '@/lib/coupons'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft, CheckCircle2, Hourglass, Check, Paperclip, Upload } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -81,7 +82,7 @@ function PayInner() {
     return (
       <Center>
         <div style={{ textAlign: 'center', maxWidth: 340 }}>
-          <div style={{ fontSize: 60 }}>{result.autoApproved ? '✅' : '⏳'}</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>{result.autoApproved ? <CheckCircle2 size={52} color="#27AE78" /> : <Hourglass size={52} color={C.orange} />}</div>
           <div style={{ fontSize: 20, fontWeight: 900, marginTop: 10 }}>
             {result.autoApproved ? 'تفعّلت الباقة فوراً!' : 'استلمنا طلبك'}
           </div>
@@ -104,7 +105,7 @@ function PayInner() {
       <div style={{ position: 'relative', maxWidth: 400, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.red }}>الدفع</div>
-          <a href="/packages" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الباقات</a>
+          <a href="/packages" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> الباقات</a>
         </div>
 
         <Card>
@@ -124,7 +125,7 @@ function PayInner() {
           <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginBottom: 8 }}>كود خصم (اختياري)</div>
           {appliedCoupon ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#27AE7814', borderRadius: 10, padding: 10 }}>
-              <span style={{ fontWeight: 800, color: '#27AE78', fontSize: 13 }}>✓ {appliedCoupon.code} مُطبّق</span>
+              <span style={{ fontWeight: 800, color: '#27AE78', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}><Check size={14} /> {appliedCoupon.code} مُطبّق</span>
               <button onClick={removeCoupon} style={{ background: 'none', border: 'none', color: C.red, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>إزالة</button>
             </div>
           ) : (
@@ -156,7 +157,7 @@ function PayInner() {
                 </div>
                 <button onClick={() => { navigator.clipboard?.writeText(settings.benefitNumber); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
                   style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${C.violet}55`, background: `${C.violet}12`, color: C.violet, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                  {copied ? '✓ نُسخ' : 'نسخ'}
+                  {copied ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={13} /> نُسخ</span> : 'نسخ'}
                 </button>
               </div>
             </>
@@ -166,7 +167,7 @@ function PayInner() {
         <Card style={{ marginTop: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}88`, marginBottom: 8 }}>ارفع صورة الإيصال</div>
           <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, borderRadius: 12, border: `1.5px dashed ${C.ink}30`, cursor: 'pointer', fontSize: 14, color: `${C.ink}88`, fontWeight: 700 }}>
-            {file ? `📎 ${file.name}` : '📤 اختر صورة الإيصال'}
+            {file ? <><Paperclip size={16} /> {file.name}</> : <><Upload size={16} /> اختر صورة الإيصال</>}
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
           </label>
         </Card>

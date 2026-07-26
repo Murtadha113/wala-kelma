@@ -8,9 +8,8 @@ import { pickRandomWork, WalaKelmaWork } from './works'
 import { pickRandomCustomWork, CUSTOM_CATEGORY_ID, type CustomWork } from './custom-works'
 import { getUserProfile, updateUserProfile } from './auth'
 import { recordGroupResult } from './friend-groups'
-import { getGameplaySettings } from './game-settings'
 import {
-  WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_QUICK_EXPLAIN,
+  WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_QUICK_EXPLAIN, WK_TEAMS_ONLY_QUESTIONS,
   type ExplainDuration, type PreTurnPowerUp,
   type JokerOutcome, drawJokerOutcome,
 } from './wala-kelma-content'
@@ -49,9 +48,10 @@ export interface WalaKelmaRoom {
   categories: string[]
   explainDuration: ExplainDuration
   mode: 'full' | 'quick'
+  playerNamesEnabled: boolean   // false = نمط "فرق فقط" بدون أسماء لاعبين فردية
   totalRounds: number
   currentRound: number
-  questionsPerRound: number   // عدد الأسئلة/الأدوار بكل جولة — يضبطه الأدمن من الإعدادات
+  questionsPerRound: number   // عدد الأسئلة/الأدوار بكل جولة — يُحسب تلقائياً (عدد اللاعبين المسجّلين، أو ثابت بنمط "فرق فقط")
   turnsThisRound: number      // عدّاد الأدوار اللي لعبت بالجولة الحالية
 
   roundStartingTeam: TeamId
@@ -108,6 +108,7 @@ function baseRoom(hostId: string, hostName: string, code: string): Omit<WalaKelm
     categories: [],
     explainDuration: 90,
     mode: 'full',
+    playerNamesEnabled: true,
     totalRounds: 2,
     currentRound: 0,
     questionsPerRound: 5,
@@ -140,9 +141,7 @@ export async function createWalaKelmaRoom(params: {
 }): Promise<{ success: true; code: string } | { success: false; error: string }> {
   try {
     const code = await uniqueCode()
-    const gameplay = await getGameplaySettings()
     const room = baseRoom(params.hostId, params.hostName, code)
-    room.questionsPerRound = gameplay.questionsPerRound
     await set(ref(rtdb, `${ROOMS}/${code}`), room)
     return { success: true, code }
   } catch (e) {
@@ -178,6 +177,7 @@ function normalizeRoom(raw: any, code: string): WalaKelmaRoom {
       B: { ...EMPTY_USED, ...(r.powerUpsUsed?.B || {}) },
     },
     currentWork: r.currentWork ?? null,
+    playerNamesEnabled: r.playerNamesEnabled ?? true,
     phaseEndsAt: r.phaseEndsAt ?? null,
     paused: r.paused ?? false,
     pausedRemainingMs: r.pausedRemainingMs ?? null,
@@ -207,6 +207,7 @@ export async function updateMatchSetup(code: string, data: {
   explainDuration?: ExplainDuration
   totalRounds?: number
   mode?: 'full' | 'quick'
+  playerNamesEnabled?: boolean
 }): Promise<void> {
   const patch: Record<string, unknown> = {}
   if (data.matchName !== undefined) patch.matchName = data.matchName
@@ -214,6 +215,7 @@ export async function updateMatchSetup(code: string, data: {
   if (data.categories !== undefined) patch.categories = data.categories
   if (data.explainDuration !== undefined) patch.explainDuration = data.explainDuration
   if (data.totalRounds !== undefined) patch.totalRounds = data.totalRounds
+  if (data.playerNamesEnabled !== undefined) patch.playerNamesEnabled = data.playerNamesEnabled
   if (data.mode !== undefined) {
     patch.mode = data.mode
     if (data.mode === 'quick') { patch.explainDuration = WK_QUICK_EXPLAIN; patch.totalRounds = 1 }
@@ -232,6 +234,15 @@ function buildRoundOrder(teams: Record<TeamId, WKTeam>, startingTeam: TeamId): W
     if (i < b.length) order.push({ team: other, playerId: b[i].id, playerName: b[i].name })
   }
   return order
+}
+
+// نمط "فرق فقط" بدون أسماء لاعبين — دور واحد صناعي بكل فريق (بدون اسم لاعب)
+function buildTeamsOnlyOrder(startingTeam: TeamId): WKTurnSlot[] {
+  const other: TeamId = startingTeam === 'A' ? 'B' : 'A'
+  return [
+    { team: startingTeam, playerId: `team-${startingTeam}`, playerName: '' },
+    { team: other, playerId: `team-${other}`, playerName: '' },
+  ]
 }
 
 // خصم لعبة من رصيد المضيف (أو استهلاك اللعبة المجانية) — يُستدعى مرة واحدة عند بدء المباراة
@@ -260,7 +271,7 @@ export async function startMatch(code: string): Promise<{ success: true } | { su
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return { success: false, error: 'الغرفة غير موجودة' }
   const room = snap.val() as WalaKelmaRoom
-  if ((room.teams.A.players?.length || 0) < 1 || (room.teams.B.players?.length || 0) < 1)
+  if (room.playerNamesEnabled !== false && ((room.teams.A.players?.length || 0) < 1 || (room.teams.B.players?.length || 0) < 1))
     return { success: false, error: 'أضف لاعبين للفريقين' }
   if ((room.categories?.length || 0) < 1) return { success: false, error: 'اختر فئة واحدة على الأقل' }
 
@@ -273,7 +284,8 @@ export async function startMatch(code: string): Promise<{ success: true } | { su
   }
 
   const startingTeam: TeamId = Math.random() < 0.5 ? 'A' : 'B'
-  const order = buildRoundOrder(room.teams, startingTeam)
+  const order = room.playerNamesEnabled === false ? buildTeamsOnlyOrder(startingTeam) : buildRoundOrder(room.teams, startingTeam)
+  const questionsPerRound = room.playerNamesEnabled === false ? WK_TEAMS_ONLY_QUESTIONS : order.length
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     status: 'draw',
     currentRound: 1,
@@ -282,6 +294,7 @@ export async function startMatch(code: string): Promise<{ success: true } | { su
     currentTurnIndex: 0,
     activeTeam: order[0]?.team ?? startingTeam,
     phase: 'idle',
+    questionsPerRound,
   })
   return { success: true }
 }
@@ -574,7 +587,8 @@ async function endRoundOrMatch(code: string, room: WalaKelmaRoom, resetTurn: Rec
   }
 
   const startingTeam: TeamId = room.roundStartingTeam === 'A' ? 'B' : 'A'
-  const order = buildRoundOrder(room.teams, startingTeam)
+  const order = room.playerNamesEnabled === false ? buildTeamsOnlyOrder(startingTeam) : buildRoundOrder(room.teams, startingTeam)
+  const questionsPerRound = room.playerNamesEnabled === false ? WK_TEAMS_ONLY_QUESTIONS : order.length
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     ...resetTurn,
     currentRound: room.currentRound + 1,
@@ -584,6 +598,7 @@ async function endRoundOrMatch(code: string, room: WalaKelmaRoom, resetTurn: Rec
     activeTeam: order[0].team,
     phase: 'roundEnd',
     turnsThisRound: 0,
+    questionsPerRound,
   })
 }
 

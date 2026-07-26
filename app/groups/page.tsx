@@ -6,6 +6,7 @@ import { onAuthChange, getUserProfile, type UserProfile } from '@/lib/auth'
 import { createGroup, joinGroupByCode, getUserGroups, type FriendGroup } from '@/lib/friend-groups'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft, Crown, Medal } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -57,7 +58,7 @@ export default function GroupsPage() {
       <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div style={{ fontSize: 24, fontWeight: 900, color: C.red }}>لوحات الصدارة</div>
-          <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← حسابي</a>
+          <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> حسابي</a>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -85,12 +86,12 @@ export default function GroupsPage() {
               <div style={{ fontSize: 12, color: `${C.ink}66`, background: C.cream, padding: '4px 10px', borderRadius: 999, fontWeight: 700 }}>كود: {g.inviteCode}</div>
             </div>
             {g.lastMonthChampion && (
-              <div style={{ fontSize: 12, color: C.orange, fontWeight: 700, marginBottom: 8 }}>👑 بطل الشهر الماضي: {g.lastMonthChampion.name} ({g.lastMonthChampion.points} نقطة)</div>
+              <div style={{ fontSize: 12, color: C.orange, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}><Crown size={13} /> بطل الشهر الماضي: {g.lastMonthChampion.name} ({g.lastMonthChampion.points} نقطة)</div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[...g.members].sort((a, b) => b.points - a.points).map((m, i) => (
                 <div key={m.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: i === 0 ? `${C.orange}14` : C.cream, borderRadius: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800 }}>{i === 0 ? '🥇 ' : `${i + 1}. `}{m.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 5 }}>{i === 0 ? <Medal size={14} color="#D4AF37" /> : `${i + 1}.`} {m.name}</span>
                   <span style={{ fontSize: 13, color: `${C.ink}77` }}>{m.points} نقطة · {m.wins} فوز · {m.gamesPlayed} مباراة</span>
                 </div>
               ))}

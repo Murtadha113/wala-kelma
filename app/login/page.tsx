@@ -6,6 +6,7 @@ import { signIn, resetPassword, authErrorMessage, signOutUser } from '@/lib/auth
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft, Mail } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -76,14 +77,14 @@ function LoginInner() {
               </button>
             </p>
             <p style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}88`, marginTop: 6 }}>
-              ما عندك حساب؟ <a href={`/signup?next=${encodeURIComponent(next || '/account')}`} style={{ color: C.violet, fontWeight: 800 }}>سوّي حساب</a>
+              ما عندك حساب؟ <a href={`/signup?next=${encodeURIComponent(next || '/account')}`} style={{ color: C.violet, fontWeight: 800 }}>إنشاء حساب</a>
             </p>
           </>
         ) : (
           <>
             {resetSent ? (
               <div style={{ textAlign: 'center', padding: '10px 0 6px' }}>
-                <div style={{ fontSize: 40 }}>📧</div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}><Mail size={36} color={C.violet} /></div>
                 <p style={{ fontSize: 14, color: `${C.ink}99`, marginTop: 8, lineHeight: 1.7 }}>
                   أرسلنا رابط استرجاع كلمة المرور لـ<br /><strong>{email}</strong><br />افتح بريدك واتبع الرابط.
                 </p>
@@ -99,15 +100,15 @@ function LoginInner() {
             )}
             <p style={{ textAlign: 'center', marginTop: 12 }}>
               <button onClick={() => { setMode('login'); setErr(''); setResetSent(false) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: C.violet, fontWeight: 700 }}>
-                ← رجوع لتسجيل الدخول
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: C.violet, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <ArrowLeft size={13} /> رجوع لتسجيل الدخول
               </button>
             </p>
           </>
         )}
 
         <p style={{ textAlign: 'center', marginTop: 8 }}>
-          <a href="/" style={{ fontSize: 12, color: `${C.ink}66` }}>← الرئيسية</a>
+          <a href="/" style={{ fontSize: 12, color: `${C.ink}66`, display: 'inline-flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={12} /> الرئيسية</a>
         </p>
       </div>
     </div>

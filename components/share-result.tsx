@@ -55,7 +55,7 @@ export function ShareResultButton({ room, refUid }: { room: WalaKelmaRoom; refUi
         <div ref={cardRef} style={{
           width: 540, height: 960, background: `linear-gradient(160deg, ${C.cream}, #fff)`,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24,
-          fontFamily: 'Cairo, sans-serif', padding: 40, direction: 'rtl', textAlign: 'center',
+          fontFamily: 'Alexandria, sans-serif', padding: 40, direction: 'rtl', textAlign: 'center',
         }}>
           <div style={{ fontSize: 40, fontWeight: 900, color: C.red }}>ولا كلمة 🎭</div>
           <div style={{ fontSize: 70 }}>🏆</div>
@@ -85,7 +85,7 @@ export function ShareResultButton({ room, refUid }: { room: WalaKelmaRoom; refUi
           width: '100%', padding: 13, borderRadius: 12, border: `1.5px solid ${C.violet}55`, background: `${C.violet}0d`,
           color: C.violet, fontWeight: 800, fontSize: 14, cursor: 'pointer', opacity: busy ? 0.6 : 1,
         }}>
-          {busy ? 'جاري التجهيز…' : '📸 شارك النتيجة'}
+          {busy ? 'جاري التجهيز…' : 'شارك النتيجة'}
         </button>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

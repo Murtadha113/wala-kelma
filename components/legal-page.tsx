@@ -1,6 +1,7 @@
 'use client'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -11,7 +12,7 @@ export function LegalPage({ title, updatedAt, children }: { title: string; updat
       <div style={{ position: 'relative', maxWidth: 640, margin: '0 auto', padding: '24px 18px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.red }}>ولا كلمة</div>
-          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
+          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> الرئيسية</a>
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>{title}</h1>
         <p style={{ fontSize: 12, color: `${C.ink}66`, marginBottom: 20 }}>آخر تحديث: {updatedAt}</p>

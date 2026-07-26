@@ -13,11 +13,15 @@ import {
   toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, getBestActor,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
-import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN } from '@/lib/wala-kelma-content'
+import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN, typeLabelForCategory } from '@/lib/wala-kelma-content'
 import { useWalaKelmaCountdown, useResultSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti } from '@/components/shared'
 import { playDrumRollSound } from '@/lib/sound'
 import { ShareResultButton } from '@/components/share-result'
 import { Logo } from '@/components/logo'
+import {
+  BookOpen, Drama, Swords, Dices, Zap, Check, AlertTriangle, Eye, EyeOff,
+  Play, Pause, Trophy, Frown, ArrowLeft, Clapperboard,
+} from 'lucide-react'
 
 const C = WK_COLORS
 const uid = () => `p_${Math.random().toString(36).slice(2, 9)}`
@@ -51,7 +55,7 @@ export default function HostPage() {
   useEffect(() => {
     if (!room?.code) return
     updateWKHostHeartbeat(room.code)
-    const t = setInterval(() => updateWKHostHeartbeat(room.code), 30000)
+    const t = setInterval(() => updateWKHostHeartbeat(room.code), 5000)
     return () => clearInterval(t)
   }, [room?.code])
 
@@ -93,6 +97,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
   const [explain, setExplain] = useState<60 | 90 | 105>(90)
   const [rounds, setRounds] = useState<number>(2)
   const [quickMode, setQuickMode] = useState(false)
+  const [namesEnabled, setNamesEnabled] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [showHelp, setShowHelp] = useState(false)
@@ -116,17 +121,18 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
     setErr('')
     const A = aPlayers.map(s => s.trim()).filter(Boolean)
     const B = bPlayers.map(s => s.trim()).filter(Boolean)
-    if (A.length < 1 || B.length < 1) { setErr('أضف لاعباً واحداً على الأقل لكل فريق'); return }
+    if (namesEnabled && (A.length < 1 || B.length < 1)) { setErr('أضف لاعباً واحداً على الأقل لكل فريق'); return }
     if (selected.length < 1) { setErr('اختر فئة واحدة على الأقل'); return }
     setBusy(true)
     const teams: Record<TeamId, { name: string; score: number; players: WKPlayer[] }> = {
-      A: { name: teamAName.trim() || 'الفريق الأول', score: 0, players: A.map(n => ({ id: uid(), name: n })) },
-      B: { name: teamBName.trim() || 'الفريق الثاني', score: 0, players: B.map(n => ({ id: uid(), name: n })) },
+      A: { name: teamAName.trim() || 'الفريق الأول', score: 0, players: namesEnabled ? A.map(n => ({ id: uid(), name: n })) : [] },
+      B: { name: teamBName.trim() || 'الفريق الثاني', score: 0, players: namesEnabled ? B.map(n => ({ id: uid(), name: n })) : [] },
     }
     await updateMatchSetup(room.code, {
       matchName: matchName.trim() || 'مباراة ولا كلمة', teams, categories: selected,
       explainDuration: explain, totalRounds: rounds,
       mode: quickMode ? 'quick' : 'full',
+      playerNamesEnabled: namesEnabled,
     })
     const res = await startMatch(room.code)
     setBusy(false)
@@ -135,7 +141,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Header title="إعداد المباراة" />
+      <Header title="إعداد المباراة" showHome />
       <DisplayLinkCard code={room.code} />
 
       <div style={{ display: 'flex', gap: 8, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12` }}>
@@ -158,7 +164,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
               <CategoryCard name={`${CUSTOM_CATEGORY_NAME} (${customCount})`} selected={selected.includes(CUSTOM_CATEGORY_ID)} onClick={() => toggleCat(CUSTOM_CATEGORY_ID)} />
             )}
           </div>
-          <button onClick={() => setStep(2)} style={{ ...primaryBtn, marginTop: 14, opacity: selected.length < 1 ? 0.5 : 1 }} disabled={selected.length < 1}>التالي ←</button>
+          <button onClick={() => setStep(2)} style={{ ...primaryBtn, marginTop: 14, opacity: selected.length < 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={selected.length < 1}>التالي <ArrowLeft size={17} /></button>
         </Card>
       )}
 
@@ -170,11 +176,11 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
               <button onClick={() => setShowHelp(v => !v)} style={{ ...iconBtn, width: 26, height: 26, fontSize: 13, borderRadius: '50%' }}>؟</button>
             </div>
             {showHelp && (
-              <div style={{ background: `${C.violet}0d`, border: `1px solid ${C.violet}22`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 12.5, color: `${C.ink}cc`, lineHeight: 1.8 }}>
-                🎬 <b>القراءة:</b> الممثّل يقرأ العمل لحاله بالوقت المحدد.<br />
-                🎭 <b>التمثيل:</b> يمثّل العمل بالحركات بدون كلام لفريقه.<br />
-                🥷 <b>السرقة:</b> لو الفريق غلط، الفريق الثاني يقدر يخمّن ويسرق النقطة.<br />
-                🃏 <b>الجوكر:</b> نتيجة عشوائية مرة واحدة كل فريق بالمباراة.
+              <div style={{ background: `${C.violet}0d`, border: `1px solid ${C.violet}22`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 12.5, color: `${C.ink}cc`, lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}><BookOpen size={15} style={{ flexShrink: 0, marginTop: 2 }} /><span><b>القراءة:</b> الممثّل يقرأ العمل لحاله بالوقت المحدد.</span></div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}><Drama size={15} style={{ flexShrink: 0, marginTop: 2 }} /><span><b>التمثيل:</b> يمثّل العمل بالحركات بدون كلام لفريقه.</span></div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}><Swords size={15} style={{ flexShrink: 0, marginTop: 2 }} /><span><b>السرقة:</b> لو الفريق غلط، الفريق الثاني يقدر يخمّن ويسرق النقطة.</span></div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}><Dices size={15} style={{ flexShrink: 0, marginTop: 2 }} /><span><b>الجوكر:</b> نتيجة عشوائية مرة واحدة كل فريق بالمباراة.</span></div>
               </div>
             )}
             <Input value={matchName} onChange={setMatchName} placeholder="اسم المباراة" />
@@ -184,46 +190,65 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
             </div>
           </Card>
           <Card>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setDistMode('manual')} style={{ ...choice(distMode === 'manual'), flex: 1 }}>توزيع يدوي</button>
-              <button onClick={() => { setDistMode('random'); setDistributed(false) }} style={{ ...choice(distMode === 'random'), flex: 1 }}>🎲 توزيع عشوائي</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <SectionTitle style={{ margin: 0 }}>بدون أسماء لاعبين</SectionTitle>
+                <Muted>فرق فقط، بدون تسجيل لاعبين — دور كل فريق يعرض باسم الفريق</Muted>
+              </div>
+              <button onClick={() => setNamesEnabled(v => !v)} style={{
+                width: 50, height: 28, borderRadius: 999, border: 'none', cursor: 'pointer', position: 'relative',
+                background: !namesEnabled ? C.violet : `${C.ink}22`, transition: 'background 0.2s', flexShrink: 0,
+              }}>
+                <span style={{
+                  position: 'absolute', top: 3, right: !namesEnabled ? 25 : 3, width: 22, height: 22, borderRadius: '50%',
+                  background: '#fff', transition: 'right 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }} />
+              </button>
             </div>
-
-            {distMode === 'manual' && (
-              <>
-                <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
-                <div style={{ height: 12 }} />
-                <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
-                <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
-              </>
-            )}
-
-            {distMode === 'random' && !distributed && (
-              <>
-                <PlayersEditor label="" title="أسماء كل اللاعبين" color={C.orange} players={allPlayers} setPlayers={setAllPlayers} />
-                <button onClick={distributeRandomly} style={{ ...primaryBtn, marginTop: 12 }}
-                  disabled={allPlayers.map(s => s.trim()).filter(Boolean).length < 2}>
-                  🎲 وزّع الفرق
-                </button>
-              </>
-            )}
-
-            {distMode === 'random' && distributed && (
-              <>
-                <Muted>توزّعوا عشوائياً — تقدر تعدّل قبل ما تبدأ:</Muted>
-                <div style={{ height: 8 }} />
-                <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
-                <div style={{ height: 12 }} />
-                <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
-                <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
-                <button onClick={() => setDistributed(false)} style={{ ...ghostBtn, marginTop: 8 }}>🎲 أعد التوزيع</button>
-              </>
-            )}
           </Card>
+          {namesEnabled && (
+            <Card>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button onClick={() => setDistMode('manual')} style={{ ...choice(distMode === 'manual'), flex: 1 }}>توزيع يدوي</button>
+                <button onClick={() => { setDistMode('random'); setDistributed(false) }} style={{ ...choice(distMode === 'random'), flex: 1 }}>توزيع عشوائي</button>
+              </div>
+
+              {distMode === 'manual' && (
+                <>
+                  <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
+                  <div style={{ height: 12 }} />
+                  <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
+                  <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
+                </>
+              )}
+
+              {distMode === 'random' && !distributed && (
+                <>
+                  <PlayersEditor label="" title="أسماء كل اللاعبين" color={C.orange} players={allPlayers} setPlayers={setAllPlayers} />
+                  <button onClick={distributeRandomly} style={{ ...primaryBtn, marginTop: 12 }}
+                    disabled={allPlayers.map(s => s.trim()).filter(Boolean).length < 2}>
+                    وزّع الفرق
+                  </button>
+                </>
+              )}
+
+              {distMode === 'random' && distributed && (
+                <>
+                  <Muted>توزّعوا عشوائياً — تقدر تعدّل قبل ما تبدأ:</Muted>
+                  <div style={{ height: 8 }} />
+                  <PlayersEditor label={teamAName} color={C.violet} players={aPlayers} setPlayers={setAPlayers} />
+                  <div style={{ height: 12 }} />
+                  <PlayersEditor label={teamBName} color={C.red} players={bPlayers} setPlayers={setBPlayers} />
+                  <TeamSizeWarning aPlayers={aPlayers} bPlayers={bPlayers} />
+                  <button onClick={() => setDistributed(false)} style={{ ...ghostBtn, marginTop: 8 }}>أعد التوزيع</button>
+                </>
+              )}
+            </Card>
+          )}
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <SectionTitle style={{ margin: 0 }}>⚡ الوضع السريع</SectionTitle>
+                <SectionTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}><Zap size={13} /> الوضع السريع</SectionTitle>
                 <Muted>دور {WK_QUICK_EXPLAIN} ثانية، جولة وحدة، بدون خصائص</Muted>
               </div>
               <button onClick={() => setQuickMode(v => !v)} style={{
@@ -249,7 +274,7 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
             </div>
           </Card>
           {err && <ErrorText>{err}</ErrorText>}
-          <button onClick={start} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : '🎭 ابدأ المباراة'}</button>
+          <button onClick={start} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : 'ابدأ المباراة'}</button>
         </>
       )}
     </div>
@@ -267,7 +292,7 @@ function CategoryCard({ name, imageUrl, selected, onClick }: { name: string; ima
       {imageUrl ? (
         <img src={imageUrl} alt={name} style={{ width: '100%', aspectRatio: '1', borderRadius: 12, objectFit: 'cover' }} />
       ) : (
-        <div style={{ width: '100%', aspectRatio: '1', borderRadius: 12, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎭</div>
+        <div style={{ width: '100%', aspectRatio: '1', borderRadius: 12, background: selected ? `${C.red}18` : `${C.ink}0a`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Drama size={32} color={selected ? C.red : `${C.ink}44`} /></div>
       )}
       <span style={{ fontSize: 13, fontWeight: 800, color: selected ? C.red : `${C.ink}99`, textAlign: 'center', lineHeight: 1.3 }}>{name}</span>
     </button>
@@ -290,7 +315,7 @@ function DisplayLinkCard({ code }: { code: string }) {
           <button onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
             className={copied ? 'wk-copied-pulse' : undefined}
             style={{ ...ghostBtn, marginTop: 8, ...(copied ? { borderColor: '#27AE78', color: '#27AE78' } : {}) }}>
-            {copied ? '✓ تم النسخ' : 'نسخ رابط العرض'}
+            {copied ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Check size={13} /> تم النسخ</span> : 'نسخ رابط العرض'}
           </button>
         </div>
       </div>
@@ -302,22 +327,40 @@ function TeamSizeWarning({ aPlayers, bPlayers }: { aPlayers: string[]; bPlayers:
   const a = aPlayers.map(s => s.trim()).filter(Boolean).length
   const b = bPlayers.map(s => s.trim()).filter(Boolean).length
   if (a === 0 || b === 0 || a === b) return null
-  return <p style={{ fontSize: 11.5, color: `${C.ink}77`, marginTop: 8 }}>⚠️ الفرق مو متساوية بالعدد — لاعبو الفريق الأصغر بيمثّلون أكثر من غيرهم نسبياً.</p>
+  return <p style={{ fontSize: 11.5, color: `${C.ink}77`, marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 5 }}><AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} /><span>الفرق مو متساوية بالعدد — لاعبو الفريق الأصغر بيمثّلون أكثر من غيرهم نسبياً.</span></p>
 }
 
 function PlayersEditor({ label, title, color, players, setPlayers }: { label: string; title?: string; color: string; players: string[]; setPlayers: (p: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  const names = players.map(s => s.trim()).filter(Boolean)
+
+  const add = () => {
+    const name = draft.trim()
+    if (!name) return
+    setPlayers([...names, name])
+    setDraft('')
+  }
+  const remove = (i: number) => setPlayers(names.filter((_, j) => j !== i))
+
   return (
     <div>
       <SectionTitle style={{ color }}>{title ?? `لاعبو ${label}`}</SectionTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {players.map((p, i) => (
-          <div key={i} style={{ display: 'flex', gap: 6 }}>
-            <input value={p} onChange={e => setPlayers(players.map((x, j) => j === i ? e.target.value : x))} placeholder={`لاعب ${i + 1}`} style={inputStyle(color)} />
-            {players.length > 1 && <button onClick={() => setPlayers(players.filter((_, j) => j !== i))} style={{ ...iconBtn, color: C.red }}>−</button>}
-          </div>
-        ))}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="اسم اللاعب"
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())}
+          style={{ ...inputStyle(color), marginBottom: 0 }} />
+        <button onClick={add} style={{ ...ghostBtn, borderColor: color, color, whiteSpace: 'nowrap' }}>إضافة</button>
       </div>
-      <button onClick={() => setPlayers([...players, ''])} style={{ ...ghostBtn, marginTop: 8 }}>+ أضف لاعب</button>
+      {names.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+          {names.map((name, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `${color}14`, border: `1px solid ${color}33`, borderRadius: 999, padding: '5px 6px 5px 12px', fontSize: 13, fontWeight: 700, color }}>
+              {name}
+              <button onClick={() => remove(i)} style={{ width: 18, height: 18, borderRadius: '50%', border: 'none', background: color, color: '#fff', fontSize: 11, lineHeight: '18px', cursor: 'pointer', padding: 0 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -338,7 +381,7 @@ function DrawScreen({ room }: { room: WalaKelmaRoom }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center', paddingTop: 40, textAlign: 'center' }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: `${C.ink}aa` }}>القرعة 🎲</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: `${C.ink}aa`, display: 'flex', alignItems: 'center', gap: 8 }}>القرعة <Dices size={22} /></div>
       {!revealed ? (
         <div style={{
           width: '100%', maxWidth: 320, height: 148, borderRadius: 22,
@@ -346,7 +389,7 @@ function DrawScreen({ room }: { room: WalaKelmaRoom }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'wkDrawShake 0.25s ease-in-out infinite',
         }}>
-          <div style={{ fontSize: 40 }}>🎲</div>
+          <Dices size={40} color="#fff" />
         </div>
       ) : (
         <div className="wk-pop-in" style={{
@@ -356,10 +399,10 @@ function DrawScreen({ room }: { room: WalaKelmaRoom }) {
         }}>
           <div style={{ fontSize: 15, opacity: 0.9, fontWeight: 700 }}>الفريق البادئ</div>
           <div style={{ fontSize: 36, fontWeight: 900, marginTop: 4 }}>{room.teams[room.activeTeam].name}</div>
-          {slot && <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
+          {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, opacity: 0.95 }}>أول لاعب: {slot.playerName}</div>}
         </div>
       )}
-      <button onClick={() => beginPlaying(room.code)} disabled={!revealed} style={{ ...primaryBtn, maxWidth: 280, opacity: revealed ? 1 : 0.4 }}>يلا نبدأ ←</button>
+      <button onClick={() => beginPlaying(room.code)} disabled={!revealed} style={{ ...primaryBtn, maxWidth: 280, opacity: revealed ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>يلا نبدأ <ArrowLeft size={18} /></button>
       <style>{`@keyframes wkDrawShake{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}`}</style>
     </div>
   )
@@ -374,19 +417,19 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const color = team === 'A' ? C.violet : C.red
   const [silencePick, setSilencePick] = useState(false)
   const [turnErr, setTurnErr] = useState('')
-  const [cats, setCats] = useState<WKCategory[]>([])
-  const [pickedCatId, setPickedCatId] = useState('')
   const [endConfirm, setEndConfirm] = useState(false)
+  const [cats, setCats] = useState<WKCategory[]>([])
   const w = room.currentWork
 
   useEffect(() => { getCategories(true).then(setCats) }, [])
 
-  const catName = (id: string) => id === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : (cats.find(c => c.id === id)?.name || '')
+  const typeLabel = w
+    ? (w.categoryId === CUSTOM_CATEGORY_ID ? 'من فئتك الخاصة' : typeLabelForCategory(cats.find(c => c.id === w.categoryId)?.name || ''))
+    : ''
 
   const handleStartTurn = async () => {
     setTurnErr('')
-    const res = await startTurn(room.code, room.hostId, pickedCatId || undefined)
-    setPickedCatId('')
+    const res = await startTurn(room.code, room.hostId)
     if (!res.success) setTurnErr(res.error)
   }
 
@@ -421,8 +464,8 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 14, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 24, fontWeight: 900, color }}>{room.teams[team].name}</div>
-          {slot && <div style={{ fontSize: 16, fontWeight: 700 }}>يمثّل: {slot.playerName}</div>}
-          {nextSlot && <div style={{ fontSize: 12, color: `${C.ink}66`, marginTop: 2 }}>التالي: {nextSlot.playerName}</div>}
+          {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 16, fontWeight: 700 }}>يمثّل: {slot.playerName}</div>}
+          {room.playerNamesEnabled !== false && nextSlot && <div style={{ fontSize: 12, color: `${C.ink}66`, marginTop: 2 }}>التالي: {nextSlot.playerName}</div>}
           {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && (
             <div style={{ fontSize: 40, fontWeight: 900, color: timeLeft <= 10 ? C.red : color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
               {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
@@ -433,20 +476,8 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
       {room.phase === 'idle' && (
         <>
-          {room.categories.length > 1 && (
-            <Card>
-              <SectionTitle>الفئة لهذا الدور (اختياري)</SectionTitle>
-              <Muted>ما اخترت؟ بنسحب عشوائياً من كل الفئات المختارة زي المعتاد.</Muted>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                {room.categories.map(id => (
-                  <button key={id} onClick={() => setPickedCatId(prev => prev === id ? '' : id)}
-                    style={pill(pickedCatId === id)}>{catName(id)}</button>
-                ))}
-              </div>
-            </Card>
-          )}
           {room.mode === 'quick' ? (
-            <Card><Muted>⚡ الوضع السريع: بدون خصائص ما قبل الدور — الجوكر متاح فقط أثناء التمثيل.</Muted></Card>
+            <Card><Muted><span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Zap size={13} /> الوضع السريع: بدون خصائص ما قبل الدور — الجوكر متاح فقط أثناء التمثيل.</span></Muted></Card>
           ) : (
             <Card>
               <SectionTitle>خصائص {room.teams[team].name} (قبل الدور)</SectionTitle>
@@ -458,12 +489,12 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
                     <div key={p.id} style={{ display: 'flex', gap: 6 }}>
                       <button disabled={used && !active} style={{ ...powerBtn(p.color, active, used), flex: 1 }}
                         onClick={() => { if (used) return; if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double' | 'deduct') }}>
-                        <span>{p.icon} {p.name}</span>
-                        <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور ✓' : used ? 'استُخدمت' : p.desc}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><p.icon size={15} /> {p.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور' : used ? 'استُخدمت' : p.desc}</span>
                       </button>
                       {active && (
                         <button onClick={() => { deactivatePowerUp(room.code, team, p.id as 'double' | 'deduct' | 'silence'); setSilencePick(false) }}
-                          style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
+                          style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>تراجع</button>
                       )}
                     </div>
                   )
@@ -479,7 +510,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               )}
             </Card>
           )}
-          <button onClick={handleStartTurn} className="wk-breathe" style={{ ...primaryBtn, ['--wk-glow' as string]: 'rgba(88,46,244,0.45)' } as React.CSSProperties}>▶️ ابدأ الدور</button>
+          <button onClick={handleStartTurn} className="wk-breathe" style={{ ...primaryBtn, padding: '26px 15px', fontSize: 20, ['--wk-glow' as string]: 'rgba(88,46,244,0.45)' } as React.CSSProperties}>ابدأ</button>
           <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
         </>
       )}
@@ -487,40 +518,39 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
       {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && w && (
         <>
           {room.categoryExhausted && (
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.orange, background: `${C.orange}14`, padding: '8px 12px', borderRadius: 10, textAlign: 'center' }}>
-              ⚠️ خلصت الأعمال الجديدة بهذي الفئة — نعيد أعمال شفتها قبل
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.orange, background: `${C.orange}14`, padding: '8px 12px', borderRadius: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <AlertTriangle size={14} /> خلصت الأعمال الجديدة بهذي الفئة — نعيد أعمال شفتها قبل
             </div>
           )}
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SectionTitle style={{ margin: 0 }}>العمل (للمقدّم فقط 🤫)</SectionTitle>
-              <button onClick={() => toggleQuestionHidden(room.code, !room.questionHidden)} style={ghostBtn}>{room.questionHidden ? '👁 إظهار' : '🙈 إخفاء'}</button>
+              <SectionTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>العمل (للمقدّم فقط) <EyeOff size={12} /></SectionTitle>
+              <button onClick={() => toggleQuestionHidden(room.code, !room.questionHidden)} title={room.questionHidden ? 'إظهار' : 'إخفاء'} style={{ ...ghostBtn, display: 'flex', alignItems: 'center' }}>{room.questionHidden ? <Eye size={16} /> : <EyeOff size={16} />}</button>
             </div>
             {!room.questionHidden ? (
-              <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-                {w.posterUrl ? <img src={w.posterUrl} alt="" width={120} style={{ borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 120, height: 165, borderRadius: 14, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, flexShrink: 0 }}>🎬</div>}
+              <div style={{ display: 'flex', gap: 18, marginTop: 14 }}>
+                {w.posterUrl ? <img src={w.posterUrl} alt="" width={150} style={{ borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 150, height: 206, borderRadius: 16, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clapperboard size={40} color={`${C.ink}44`} /></div>}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.2 }}>{w.title}</div>
-                  <div style={{ fontSize: 13, color: `${C.ink}99`, marginTop: 6 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
-                  {w.actors?.length > 0 && <div style={{ fontSize: 13, color: `${C.ink}99`, marginTop: 3 }}>👤 {w.actors.join('، ')}</div>}
-                  {w.extraInfo && <div style={{ fontSize: 13, color: `${C.ink}aa`, marginTop: 5 }}>{w.extraInfo}</div>}
+                  {typeLabel && <div style={{ fontSize: 13, fontWeight: 800, color: C.violet, marginBottom: 4 }}>{typeLabel}</div>}
+                  <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.2 }}>{w.title}</div>
+                  <div style={{ fontSize: 14, color: `${C.ink}99`, marginTop: 8 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
                 </div>
               </div>
             ) : <div style={{ padding: 20, textAlign: 'center', color: `${C.ink}66` }}>العمل مخفي</div>}
           </Card>
 
-          {room.phase === 'reading' && <button onClick={() => beginActing(room.code)} style={primaryBtn}>جاهز — ابدأ التمثيل ▶️</button>}
+          {room.phase === 'reading' && <button onClick={() => beginActing(room.code)} style={primaryBtn}>جاهز — ابدأ التمثيل</button>}
 
           {room.phase === 'acting' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => markCorrect(room.code, team)} style={successBtn}>✅ صح ({room.teams[team].name})</button>
-              <button onClick={() => markWrong(room.code)} style={dangerBtn}>❌ غلط → سرقة</button>
+              <button onClick={() => markCorrect(room.code, team)} style={successBtn}>صح ({room.teams[team].name})</button>
+              <button onClick={() => markWrong(room.code)} style={dangerBtn}>غلط → سرقة</button>
             </div>
           )}
 
           {room.phase === 'stealing' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => markCorrect(room.code, other)} style={{ ...successBtn, background: C.red }}>🥷 سرقها {room.teams[other].name}</button>
+              <button onClick={() => markCorrect(room.code, other)} style={{ ...successBtn, background: C.red }}>سرقها {room.teams[other].name}</button>
               <button onClick={() => onStealTimeUp(room.code)} style={dangerBtn}>ما خمّنوا</button>
             </div>
           )}
@@ -528,20 +558,20 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           <div style={{ display: 'flex', gap: 8 }}>
             {!room.powerUpsUsed[team].joker && (
               <button onClick={() => useJoker(room.code)} className="wk-breathe"
-                style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>🃏 جوكر</button>
+                style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>جوكر</button>
             )}
-            <button onClick={() => togglePause(room.code)} style={{ ...ghostBtn, flex: 1 }}>{room.paused ? '▶️ استئناف' : '⏸ إيقاف'}</button>
-            <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>🔄 إعادة الوقت</button>
+            <button onClick={() => togglePause(room.code)} title={room.paused ? 'استئناف' : 'إيقاف'} style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{room.paused ? <Play size={16} /> : <Pause size={16} />}</button>
+            <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>إعادة الوقت</button>
           </div>
           {room.joker && (
             <div className="wk-pop-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange }}>
-                🃏 نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
+              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Dices size={16} /> نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
               </div>
               {room.joker.outcome === 'redoWithNewWork' && (
-                <button onClick={() => startTurn(room.code, room.hostId)} style={{ ...ghostBtn, borderColor: '#27AE78', color: '#27AE78' }}>🔁 اسحب العمل الجديد</button>
+                <button onClick={() => startTurn(room.code, room.hostId)} style={{ ...ghostBtn, borderColor: '#27AE78', color: '#27AE78' }}>اسحب العمل الجديد</button>
               )}
-              <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>↩️ تراجع</button>
+              <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>تراجع</button>
             </div>
           )}
           <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
@@ -558,7 +588,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               {room.lastResult?.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
             </div>
           </Card>
-          <button onClick={() => nextTurn(room.code)} style={primaryBtn}>الدور التالي ←</button>
+          <button onClick={() => nextTurn(room.code)} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>الدور التالي <ArrowLeft size={17} /></button>
         </>
       )}
 
@@ -597,7 +627,7 @@ function RoundEndSummary({ room, onContinue }: { room: WalaKelmaRoom; onContinue
           {leading ? `${leading} متقدّم بـ ${diff} ${diff === 1 ? 'نقطة' : 'نقاط'} 🔥` : 'تعادل حتى الآن 🤝'}
         </div>
       </Card>
-      <button onClick={onContinue} style={primaryBtn}>ابدأ الجولة التالية ←</button>
+      <button onClick={onContinue} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>ابدأ الجولة التالية <ArrowLeft size={17} /></button>
     </>
   )
 }
@@ -620,8 +650,8 @@ function ConfirmModal({ title, desc, onCancel, onConfirm }: { title: string; des
 function SkipCancelRow({ room, setEndConfirm }: { room: WalaKelmaRoom; setEndConfirm: (v: boolean) => void }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
-      {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'idle') && <button onClick={() => skipTurn(room.code)} style={{ ...ghostBtn, flex: 1 }}>⏭ تخطّي العمل</button>}
-      <button onClick={() => setEndConfirm(true)} style={{ ...ghostBtn, flex: 1, color: C.red, borderColor: `${C.red}55` }}>🏁 إنهاء</button>
+      {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'idle') && <button onClick={() => skipTurn(room.code)} style={{ ...ghostBtn, flex: 1 }}>تخطّي العمل</button>}
+      <button onClick={() => setEndConfirm(true)} style={{ ...ghostBtn, flex: 1, color: C.red, borderColor: `${C.red}55` }}>إنهاء</button>
     </div>
   )
 }
@@ -633,7 +663,7 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center', paddingTop: 30, textAlign: 'center' }}>
       <Confetti count={70} active={win !== 'draw'} />
-      <div className="wk-float" style={{ fontSize: 64 }}>🏆</div>
+      <div className="wk-float"><Trophy size={56} color={C.orange} /></div>
       <div className="wk-pop-in" style={{ fontSize: 30, fontWeight: 900, color: win === 'A' ? C.violet : win === 'B' ? C.red : C.ink }}>{win === 'draw' ? 'تعادل!' : `فاز ${room.teams[win as TeamId].name}`}</div>
       <div style={{ display: 'flex', gap: 12, width: '100%' }}>
         {(['A', 'B'] as TeamId[]).map(id => (
@@ -643,14 +673,17 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
           </div>
         ))}
       </div>
-      {bestActor && (
+      {room.playerNamesEnabled !== false && bestActor && (
         <div style={{ background: `${C.orange}14`, borderRadius: 14, padding: '10px 20px', border: `1px solid ${C.orange}22`, boxShadow: `0 8px 20px ${C.orange}1c` }}>
-          <span style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>🎭 أفضل ممثل: </span>
+          <span style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Drama size={14} color={C.orange} /> أفضل ممثل: </span>
           <span style={{ fontSize: 16, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
         </div>
       )}
       <ShareResultButton room={room} refUid={room.hostId} />
-      <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, maxWidth: 280 }}>🎭 مباراة جديدة</button>
+      <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 280 }}>
+        <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, flex: 1 }}>مباراة جديدة</button>
+        <a href="/" style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none' }}><ArrowLeft size={14} /> الرئيسية</a>
+      </div>
     </div>
   )
 }
@@ -668,14 +701,15 @@ function Loading() {
 function ErrorScreen({ msg, onBack }: { msg: string; onBack: () => void }) {
   return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 50 }}>😕</div>
+      <Frown size={44} color={`${C.ink}66`} style={{ margin: '0 auto' }} />
       <p style={{ fontSize: 18, fontWeight: 800, color: C.ink, marginTop: 10 }}>{msg}</p>
       <button onClick={onBack} style={{ ...primaryBtn, maxWidth: 220, marginTop: 16 }}>رجوع</button>
     </div>
   </div>
 }
-function Header({ title }: { title: string }) {
-  return <div style={{ textAlign: 'center' }}>
+function Header({ title, showHome }: { title: string; showHome?: boolean }) {
+  return <div style={{ textAlign: 'center', position: 'relative' }}>
+    {showHome && <a href="/" style={{ position: 'absolute', top: 0, right: 0, fontSize: 12, fontWeight: 800, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={12} /> الرئيسية</a>}
     <div style={{ display: 'flex', justifyContent: 'center' }}><Logo height={46} /></div>
     <div style={{ fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 6 }}>{title}</div>
   </div>
@@ -692,7 +726,7 @@ const inputStyle = (accent?: string): React.CSSProperties => ({ width: '100%', p
 const primaryBtn: React.CSSProperties = { width: '100%', padding: '22px 15px', borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 18, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
 const successBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: '#27AE78', cursor: 'pointer', boxShadow: '0 10px 24px #27AE7833' }
 const dangerBtn: React.CSSProperties = { flex: 1, padding: 15, borderRadius: 14, border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, background: C.red, cursor: 'pointer', boxShadow: `0 10px 24px ${C.red}33` }
-const ghostBtn: React.CSSProperties = { padding: '9px 12px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13, cursor: 'pointer' }
+const ghostBtn: React.CSSProperties = { padding: '9px 12px', borderRadius: 12, borderWidth: 1.5, borderStyle: 'solid', borderColor: `${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13, cursor: 'pointer' }
 const iconBtn: React.CSSProperties = { width: 40, borderRadius: 12, border: `1px solid ${C.ink}20`, background: '#fff', fontWeight: 900, fontSize: 18, cursor: 'pointer' }
 const miniBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 9, border: `1px solid ${C.ink}20`, background: C.cream, fontWeight: 900, fontSize: 16, cursor: 'pointer', color: C.ink }
 const pill = (on: boolean): React.CSSProperties => ({ padding: '8px 14px', borderRadius: 999, fontWeight: 800, fontSize: 13, cursor: 'pointer', border: `1.5px solid ${on ? C.red : C.ink + '22'}`, background: on ? `${C.red}14` : 'transparent', color: on ? C.red : `${C.ink}99` })

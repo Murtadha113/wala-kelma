@@ -6,6 +6,7 @@ import { onAuthChange } from '@/lib/auth'
 import { getActivePackages, type Package } from '@/lib/packages'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft, Flame } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -28,7 +29,7 @@ export default function PackagesPage() {
       <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 26, fontWeight: 900, color: C.red }}>الباقات</div>
-          <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← حسابي</a>
+          <a href="/account" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> حسابي</a>
         </div>
 
         {loading && <p style={{ textAlign: 'center', color: `${C.ink}88` }}>جاري التحميل…</p>}
@@ -48,8 +49,8 @@ export default function PackagesPage() {
                 boxShadow: p.isFeatured ? `0 14px 34px ${C.orange}22` : `0 8px 22px ${C.ink}0a`,
               }}>
               {p.isFeatured && (
-                <div style={{ position: 'absolute', top: -10, right: 16, background: C.orange, color: '#fff', fontSize: 11, fontWeight: 900, padding: '3px 10px', borderRadius: 999 }}>
-                  الأكثر مبيعاً 🔥
+                <div style={{ position: 'absolute', top: -10, right: 16, background: C.orange, color: '#fff', fontSize: 11, fontWeight: 900, padding: '3px 10px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  الأكثر مبيعاً <Flame size={12} />
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

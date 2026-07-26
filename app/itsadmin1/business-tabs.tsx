@@ -9,8 +9,8 @@ import { getAllPackages, addPackage, updatePackage, deletePackage, type Package,
 import { getAllCoupons, addCoupon, updateCoupon, deleteCoupon, type Coupon, type NewCoupon, type CouponType } from '@/lib/coupons'
 import { getPaymentSettings, setPaymentSettings, type PaymentSettings } from '@/lib/payments'
 import { getContactSettings, setContactSettings, type ContactSettings } from '@/lib/contact'
-import { getGameplaySettings, setGameplaySettings, type GameplaySettings } from '@/lib/game-settings'
 import { getCategories } from '@/lib/works'
+import { Users, Gamepad2, Hourglass, Receipt, Wallet, Ban, Drama, Gift, Flame, Check } from 'lucide-react'
 
 const ADMIN_ID = 'admin' // بوابة الأدمن الحالية بكلمة مرور بدون حسابات مصادقة منفصلة للأدمن
 
@@ -39,20 +39,20 @@ export function DashboardTab() {
   if (!stats) return <Card><Muted>جاري التحميل…</Muted></Card>
 
   const tiles = [
-    { label: 'المستخدمون', value: stats.users, color: C.violet, emoji: '👥' },
-    { label: 'المشتركون', value: stats.subscribers, color: '#27AE78', emoji: '🎮' },
-    { label: 'طلبات بانتظار المراجعة', value: stats.pendingOrders, color: C.orange, emoji: '⏳' },
-    { label: 'إجمالي الطلبات', value: stats.totalOrders, color: C.violet, emoji: '🧾' },
-    { label: 'الإيرادات (د.ب)', value: stats.revenue.toFixed(3), color: '#27AE78', emoji: '💰' },
-    { label: 'حسابات محظورة', value: stats.blocked, color: C.red, emoji: '🚫' },
-    { label: 'الفئات الظاهرة', value: `${stats.activeCategories}/${stats.categories}`, color: C.violet, emoji: '🎭' },
+    { label: 'المستخدمون', value: stats.users, color: C.violet, Icon: Users },
+    { label: 'المشتركون', value: stats.subscribers, color: '#27AE78', Icon: Gamepad2 },
+    { label: 'طلبات بانتظار المراجعة', value: stats.pendingOrders, color: C.orange, Icon: Hourglass },
+    { label: 'إجمالي الطلبات', value: stats.totalOrders, color: C.violet, Icon: Receipt },
+    { label: 'الإيرادات (د.ب)', value: stats.revenue.toFixed(3), color: '#27AE78', Icon: Wallet },
+    { label: 'حسابات محظورة', value: stats.blocked, color: C.red, Icon: Ban },
+    { label: 'الفئات الظاهرة', value: `${stats.activeCategories}/${stats.categories}`, color: C.violet, Icon: Drama },
   ]
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
       {tiles.map(t => (
         <Card key={t.label}>
-          <div style={{ fontSize: 20 }}>{t.emoji}</div>
+          <t.Icon size={20} color={t.color} />
           <div style={{ fontSize: 24, fontWeight: 900, color: t.color, marginTop: 4 }}>{t.value}</div>
           <div style={{ fontSize: 12, color: `${C.ink}88`, fontWeight: 700, marginTop: 2 }}>{t.label}</div>
         </Card>
@@ -209,7 +209,7 @@ export function UsersTab() {
             <button onClick={() => adjustBalance(u, -1)} style={ghostBtn}>−1</button>
             <input type="number" value={grantAmount[u.id] || ''} onChange={e => setGrantAmount(prev => ({ ...prev, [u.id]: e.target.value }))}
               placeholder="عدد الألعاب" style={{ ...input, marginBottom: 0, width: 90, padding: '9px 10px' }} />
-            <button onClick={() => grantExact(u)} style={{ ...ghostBtn, color: '#27AE78', borderColor: '#27AE7855' }}>🎁 امنح</button>
+            <button onClick={() => grantExact(u)} style={{ ...ghostBtn, color: '#27AE78', borderColor: '#27AE7855', display: 'flex', alignItems: 'center', gap: 4 }}><Gift size={13} /> امنح</button>
             <button onClick={() => toggleBlock(u)} style={{ ...ghostBtn, color: u.isBlocked ? '#27AE78' : C.red, marginRight: 'auto' }}>
               {u.isBlocked ? 'فك الحظر' : 'حظر'}
             </button>
@@ -267,7 +267,7 @@ export function PackagesAdminTab() {
         <Card key={p.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontWeight: 800 }}>{p.nameAr} {p.isFeatured && '🔥'} {!p.isActive && <span style={{ color: C.red, fontSize: 12 }}>(موقوفة)</span>}</div>
+              <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 5 }}>{p.nameAr} {p.isFeatured && <Flame size={14} color={C.orange} />} {!p.isActive && <span style={{ color: C.red, fontSize: 12 }}>(موقوفة)</span>}</div>
               <div style={{ fontSize: 12, color: `${C.ink}88` }}>{p.gamesCount} لعبة — {p.price.toFixed(3)} د.ب</div>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -372,44 +372,10 @@ export function SettingsTab() {
           <Toggle label="وضع الصيانة" checked={s.maintenanceMode} onChange={v => setS({ ...s, maintenanceMode: v })} />
         </div>
         {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{err}</p>}
-        <button onClick={save} style={primaryBtn}>{saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}</button>
+        <button onClick={save} style={primaryBtn}>{saved ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Check size={14} /> تم الحفظ</span> : 'حفظ الإعدادات'}</button>
       </Card>
-      <GameplaySettingsCard />
       <ContactSettingsCard />
     </div>
-  )
-}
-
-function GameplaySettingsCard() {
-  const [g, setG] = useState<GameplaySettings | null>(null)
-  const [saved, setSaved] = useState(false)
-  const [err, setErr] = useState('')
-  useEffect(() => { getGameplaySettings().then(setG) }, [])
-
-  if (!g) return <Card><Muted>جاري التحميل…</Muted></Card>
-
-  const save = async () => {
-    setErr('')
-    if (!Number.isFinite(g.questionsPerRound) || g.questionsPerRound < 1) { setErr('العدد لازم يكون 1 أو أكثر'); return }
-    try {
-      await setGameplaySettings(g)
-      setSaved(true); setTimeout(() => setSaved(false), 1500)
-    } catch (e) {
-      console.error('setGameplaySettings failed:', e)
-      setErr('فشل الحفظ: ' + (e as Error).message)
-    }
-  }
-
-  return (
-    <Card>
-      <SectionTitle>إعدادات اللعب</SectionTitle>
-      <Muted>عدد الأسئلة (الأدوار) بكل جولة — يطبّق على كل مباراة جديدة تُنشأ بعد الحفظ (ما يأثر على مباريات جارية حالياً).</Muted>
-      <input type="number" min={1} value={g.questionsPerRound}
-        onChange={e => setG({ ...g, questionsPerRound: Number(e.target.value) })}
-        placeholder="عدد الأسئلة بكل جولة" style={input} />
-      {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{err}</p>}
-      <button onClick={save} style={primaryBtn}>{saved ? '✓ تم الحفظ' : 'حفظ'}</button>
-    </Card>
   )
 }
 
@@ -446,7 +412,7 @@ function ContactSettingsCard() {
       <input value={c.twitter} onChange={e => set('twitter', e.target.value)} placeholder="معرّف X / تويتر" style={input} />
       <input value={c.snapchat} onChange={e => set('snapchat', e.target.value)} placeholder="معرّف سناب شات" style={input} />
       {err && <p style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{err}</p>}
-      <button onClick={save} style={primaryBtn}>{saved ? '✓ تم الحفظ' : 'حفظ بيانات التواصل'}</button>
+      <button onClick={save} style={primaryBtn}>{saved ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Check size={14} /> تم الحفظ</span> : 'حفظ بيانات التواصل'}</button>
     </Card>
   )
 }

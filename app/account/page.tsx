@@ -8,6 +8,7 @@ import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, typ
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 import { GradientBlobs } from '@/components/shared'
+import { ArrowLeft, Gift, CreditCard, Trophy, Star, Check, RefreshCw } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -41,7 +42,7 @@ export default function AccountPage() {
       <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <Logo height={30} />
-          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
+          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> الرئيسية</a>
         </div>
 
         <Card>
@@ -52,11 +53,11 @@ export default function AccountPage() {
         <div style={{ textAlign: 'center', marginTop: 12, borderRadius: 20, padding: 20, background: '#fff', border: `1px solid ${C.violet}22`, boxShadow: `0 14px 34px ${C.violet}1c` }}>
           <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>رصيدك من الألعاب</div>
           <div style={{ fontSize: 48, fontWeight: 900, color: C.violet, margin: '6px 0' }}>{profile.gamesBalance}</div>
-          {!profile.freeGameUsed && <div style={{ fontSize: 13, color: '#27AE78', fontWeight: 800 }}>🎁 عندك لعبة مجانية أول مرة</div>}
+          {!profile.freeGameUsed && <div style={{ fontSize: 13, color: '#27AE78', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><Gift size={14} /> عندك لعبة مجانية أول مرة</div>}
           {noBalance && <div style={{ fontSize: 13, color: C.red, fontWeight: 800 }}>ما عندك رصيد — اشترِ باقة عشان تلعب</div>}
           <a href="/packages" className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
-            style={{ display: 'block', marginTop: 12, padding: 13, borderRadius: 12, color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, textDecoration: 'none', boxShadow: `0 10px 24px ${C.red}33` }}>
-            💳 اشترِ باقة
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, padding: 13, borderRadius: 12, color: '#fff', fontWeight: 900, fontSize: 15, background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, textDecoration: 'none', boxShadow: `0 10px 24px ${C.red}33` }}>
+            <CreditCard size={16} /> اشترِ باقة
           </a>
         </div>
 
@@ -66,8 +67,8 @@ export default function AccountPage() {
         </Card>
 
         <a href="/groups" className="transition-transform hover:scale-[1.01] active:scale-[0.99]"
-          style={{ display: 'block', marginTop: 12, padding: 14, borderRadius: 16, background: '#fff', border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, textDecoration: 'none', color: C.ink, fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
-          🏆 لوحات الصدارة مع الأصدقاء
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, padding: 14, borderRadius: 16, background: '#fff', border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, textDecoration: 'none', color: C.ink, fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
+          <Trophy size={16} color={C.orange} /> لوحات الصدارة مع الأصدقاء
         </a>
 
         <Card style={{ marginTop: 12 }}>
@@ -78,7 +79,7 @@ export default function AccountPage() {
           <button onClick={async () => { setResetting(true); await clearSeenWorks(profile.id); setResetting(false); setResetDone(true); setTimeout(() => setResetDone(false), 2000) }}
             disabled={resetting}
             style={{ width: '100%', padding: 12, borderRadius: 12, border: `1.5px solid ${C.violet}55`, background: `${C.violet}0d`, color: C.violet, fontWeight: 800, fontSize: 14, cursor: 'pointer', opacity: resetting ? 0.6 : 1 }}>
-            {resetDone ? '✓ تم' : resetting ? '…' : 'نسيت الأعمال 🔄'}
+            {resetDone ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Check size={14} /> تم</span> : resetting ? '…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>نسيت الأعمال <RefreshCw size={14} /></span>}
           </button>
         </Card>
 
@@ -120,7 +121,7 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
 
   return (
     <Card style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700, marginBottom: 4 }}>⭐ فئتي الخاصة</div>
+      <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}><Star size={13} /> فئتي الخاصة</div>
       <p style={{ fontSize: 12, color: `${C.ink}77`, marginBottom: 10, lineHeight: 1.7 }}>
         أضف أعمالك أو أسماء ومواقف من عندك — تظهر كفئة إضافية وقت إعداد المباراة.
         {!hasActiveBalance && ` (حد ${FREE_CUSTOM_LIMIT} بدون رصيد نشط، بدون حد مع أي باقة)`}

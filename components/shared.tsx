@@ -110,17 +110,17 @@ export function TimerRing({ timeLeft, total, danger }: { timeLeft: number; total
   const mm = Math.floor(timeLeft / 60)
   const ss = timeLeft % 60
   return (
-    <div style={{ position: 'relative', width: 200, height: 200,
+    <div style={{ position: 'relative', width: 'clamp(160px, 20vw, 340px)', height: 'clamp(160px, 20vw, 340px)',
       filter: critical ? `drop-shadow(0 0 ${6 + (10 - timeLeft) * 1.4}px ${C.red}aa)` : undefined,
       transition: 'filter 0.3s' }}>
-      <svg width={200} height={200} style={{ transform: 'rotate(-90deg)' }}>
+      <svg viewBox="0 0 200 200" width="100%" height="100%" style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={100} cy={100} r={R} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={14} />
         <circle cx={100} cy={100} r={R} fill="none" stroke={color} strokeWidth={14} strokeLinecap="round"
           strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
           style={{ transition: 'stroke-dashoffset 0.4s linear, stroke 0.3s' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 44, fontWeight: 900, color, fontVariantNumeric: 'tabular-nums',
+        fontSize: 'clamp(34px, 4.2vw, 68px)', fontWeight: 900, color, fontVariantNumeric: 'tabular-nums',
         animation: critical ? 'wkPulse 0.7s infinite' : undefined }}>
         {mm > 0 ? `${mm}:${ss.toString().padStart(2, '0')}` : ss}
       </div>
@@ -130,8 +130,8 @@ export function TimerRing({ timeLeft, total, danger }: { timeLeft: number; total
 }
 
 export function ScoreBoard({ room, size = 'md' }: { room: WalaKelmaRoom; size?: 'sm' | 'md' | 'lg' }) {
-  const font = size === 'lg' ? 56 : size === 'sm' ? 26 : 40
-  const label = size === 'lg' ? 20 : 14
+  const font = size === 'lg' ? 'clamp(40px, 5.5vw, 88px)' : size === 'sm' ? 'clamp(22px, 2.6vw, 32px)' : 'clamp(28px, 3.6vw, 56px)'
+  const label = size === 'lg' ? 'clamp(15px, 1.8vw, 24px)' : 'clamp(12px, 1.3vw, 17px)'
   const cell = (id: TeamId, color: string) => {
     const active = room.activeTeam === id && room.status === 'playing'
     return (
@@ -167,13 +167,13 @@ export function PowerUpsGrid({ room, teamId }: { room: WalaKelmaRoom; teamId: Te
         return (
           <div key={p.id} title={p.name} style={{
             display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 999,
-            fontSize: 12, fontWeight: 800,
+            fontSize: 'clamp(12px, 1.1vw, 16px)', fontWeight: 800,
             border: `1.5px solid ${isUsed ? 'rgba(0,0,0,0.12)' : p.color}`,
             background: isUsed ? 'rgba(0,0,0,0.05)' : `${p.color}18`,
             color: isUsed ? 'rgba(0,0,0,0.35)' : p.color,
             opacity: isUsed ? 0.55 : 1, textDecoration: isUsed ? 'line-through' : 'none',
           }}>
-            <span>{p.icon}</span><span>{p.name}</span>
+            <p.icon size={12} /><span>{p.name}</span>
           </div>
         )
       })}

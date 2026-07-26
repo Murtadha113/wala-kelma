@@ -1,4 +1,5 @@
 import { LegalPage, Section } from '@/components/legal-page'
+import { AlertTriangle } from 'lucide-react'
 
 export default function PrivacyPage() {
   return (
@@ -21,8 +22,9 @@ export default function PrivacyPage() {
       <Section title="6. التواصل">
         لأي استفسار عن الخصوصية، تواصل معنا عبر وسائل الدعم المتوفرة بالتطبيق.
       </Section>
-      <p style={{ fontSize: 12, opacity: 0.6, marginTop: 20 }}>
-        ⚠️ هذا نص عام مبدئي وليس استشارة قانونية — راجعه مع مختص قانوني قبل الإطلاق التجاري.
+      <p style={{ fontSize: 12, opacity: 0.6, marginTop: 20, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>هذا نص عام مبدئي وليس استشارة قانونية — راجعه مع مختص قانوني قبل الإطلاق التجاري.</span>
       </p>
     </LegalPage>
   )

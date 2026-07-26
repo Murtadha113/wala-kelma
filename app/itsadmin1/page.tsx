@@ -8,10 +8,12 @@ import {
   WKCategory, WalaKelmaWork, NewWork, Difficulty,
 } from '@/lib/works'
 import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/components/admin-ui'
+import { getBanners, setBanners, BannerItem } from '@/lib/banners'
 import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/itsadmin1/business-tabs'
 import { Logo } from '@/components/logo'
 import { onAuthChange, signIn, signOutUser, getUserProfile, authErrorMessage } from '@/lib/auth'
 import { GradientBlobs } from '@/components/shared'
+import { Ban, ArrowLeft, Drama, Upload, Link2, Eye, EyeOff, ClipboardList, X, Clapperboard, FileText } from 'lucide-react'
 
 type GateState = 'checking' | 'signedOut' | 'denied' | 'granted'
 
@@ -21,7 +23,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState<'dashboard' | 'works' | 'categories' | 'import' | 'orders' | 'users' | 'packages' | 'coupons' | 'settings'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'works' | 'categories' | 'banners' | 'import' | 'orders' | 'users' | 'packages' | 'coupons' | 'settings'>('dashboard')
 
   useEffect(() => onAuthChange(async user => {
     if (!user) { setGate('signedOut'); return }
@@ -65,7 +67,7 @@ export default function AdminPage() {
     return <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
       <GradientBlobs />
       <div style={{ position: 'relative', background: '#fff', borderRadius: 20, padding: 28, border: `1px solid ${C.ink}12`, boxShadow: `0 20px 50px ${C.ink}14`, width: '100%', maxWidth: 340, textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><Ban size={36} color={C.red} /></div>
         <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>حسابك ما عنده صلاحية دخول لوحة الإدارة</div>
         <button onClick={() => signOutUser()} style={ghostBtn}>تسجيل خروج</button>
       </div>
@@ -83,13 +85,13 @@ export default function AdminPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={() => signOutUser()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: `${C.ink}88` }}>تسجيل خروج</button>
-            <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none' }}>← الرئيسية</a>
+            <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> الرئيسية</a>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, marginBottom: 16, flexWrap: 'wrap' }}>
           {([
-            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['import', 'استيراد CSV'],
+            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['banners', 'البنر'], ['import', 'استيراد CSV'],
             ['orders', 'الطلبات'], ['users', 'المستخدمون'], ['packages', 'الباقات'], ['coupons', 'الكوبونات'], ['settings', 'الإعدادات'],
           ] as const).map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)} style={{
@@ -103,6 +105,7 @@ export default function AdminPage() {
         {tab === 'dashboard' && <DashboardTab />}
         {tab === 'works' && <WorksTab />}
         {tab === 'categories' && <CategoriesTab />}
+        {tab === 'banners' && <BannersTab />}
         {tab === 'import' && <ImportTab />}
         {tab === 'orders' && <OrdersTab />}
         {tab === 'users' && <UsersTab />}
@@ -179,16 +182,16 @@ function CategoriesTab() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {c.imageUrl
               ? <img src={c.imageUrl} alt={c.name} width={44} height={44} style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
-              : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🎭</div>}
+              : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Drama size={18} color={`${C.ink}66`} /></div>}
             <span style={{ flex: 1, fontWeight: 800 }}>{c.name}</span>
-            <label style={{ ...ghostBtn, cursor: 'pointer' }}>
-              {uploadingId === c.id ? '…' : c.imageUrl ? 'تغيير' : '📤 صورة'}
+            <label style={{ ...ghostBtn, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {uploadingId === c.id ? '…' : c.imageUrl ? 'تغيير' : <><Upload size={13} /> صورة</>}
               <input type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadCategoryImage(c.id, f) }} />
             </label>
-            <button onClick={() => { setUrlEditId(urlEditId === c.id ? null : c.id); setUrlValue(c.imageUrl || '') }} style={ghostBtn}>🔗</button>
+            <button onClick={() => { setUrlEditId(urlEditId === c.id ? null : c.id); setUrlValue(c.imageUrl || '') }} title="رابط الصورة" style={{ ...ghostBtn, display: 'flex', alignItems: 'center' }}><Link2 size={14} /></button>
             <button onClick={async () => { setErr(''); try { await updateCategory(c.id, { isActive: !c.isActive }); reload() } catch (e) { setErr('فشل التحديث: ' + (e as Error).message) } }}
-              style={{ ...ghostBtn, color: c.isActive ? '#27AE78' : C.red }}>{c.isActive ? '👁 ظاهرة' : '🙈 مخفية'}</button>
+              title={c.isActive ? 'ظاهرة' : 'مخفية'} style={{ ...ghostBtn, color: c.isActive ? '#27AE78' : C.red, display: 'flex', alignItems: 'center' }}>{c.isActive ? <Eye size={14} /> : <EyeOff size={14} />}</button>
             <button onClick={async () => { if (!confirm('حذف الفئة؟')) return; setErr(''); try { await deleteCategory(c.id); reload() } catch (e) { setErr('فشل الحذف: ' + (e as Error).message) } }} style={{ ...ghostBtn, color: C.red }}>حذف</button>
           </div>
           {urlEditId === c.id && (
@@ -198,6 +201,71 @@ function CategoriesTab() {
               <button onClick={() => saveUrl(c.id)} style={{ ...ghostBtn, color: '#27AE78' }}>حفظ</button>
             </div>
           )}
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// ═══════════════ البنر ═══════════════
+function BannersTab() {
+  const [items, setItems] = useState<BannerItem[]>([])
+  const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr] = useState('')
+  const reload = () => getBanners().then(setItems)
+  useEffect(() => { reload() }, [])
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true); setErr('')
+    try {
+      const newItems: BannerItem[] = []
+      for (const file of Array.from(files)) {
+        const url = await uploadImage(file, 'banners')
+        newItems.push({ id: crypto.randomUUID(), imageUrl: url })
+      }
+      const next = [...items, ...newItems]
+      await setBanners(next)
+      setItems(next)
+    } catch (e) {
+      setErr('فشل رفع الصورة: ' + (e as Error).message)
+    }
+    setUploading(false)
+  }
+
+  const remove = async (id: string) => {
+    setBusy(true); setErr('')
+    try {
+      const next = items.filter(b => b.id !== id)
+      await setBanners(next)
+      setItems(next)
+    } catch (e) {
+      setErr('فشل الحذف: ' + (e as Error).message)
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {err && <Card><p style={{ color: C.red, fontWeight: 700, fontSize: 13 }}>{err}</p></Card>}
+      <Card>
+        <SectionTitle>صور البنر بالصفحة الرئيسية</SectionTitle>
+        <Muted>ارفع صورة أو أكثر تظهر كبنر بأعلى الصفحة الرئيسية (فوق زر "ابدأ اللعبة"). لو رفعت أكثر من صورة تتبدّل تلقائياً. لو ما فيه صور، ما يظهر بنر.</Muted>
+        <label style={{ ...ghostBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }}>
+          <Upload size={14} /> {uploading ? 'جاري الرفع…' : 'إضافة صورة/صور'}
+          <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={uploading}
+            onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
+        </label>
+      </Card>
+      {items.length === 0 && <Card><Muted>ما فيه صور بنر حالياً — ما يظهر بنر بالصفحة الرئيسية.</Muted></Card>}
+      {items.map(b => (
+        <Card key={b.id}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src={b.imageUrl} alt="" style={{ width: 90, height: 50, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 12, color: `${C.ink}66`, wordBreak: 'break-all' }}>{b.imageUrl}</span>
+            <button onClick={() => remove(b.id)} disabled={busy} style={{ ...ghostBtn, color: C.red }}>حذف</button>
+          </div>
         </Card>
       ))}
     </div>
@@ -272,7 +340,7 @@ function WorksTab() {
           <option value="">كل الفئات ({works.length})</option>
           {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
         </select>
-        <button onClick={openQuickAdd} style={{ ...ghostBtn, width: 'auto', padding: '11px 14px', whiteSpace: 'nowrap' }}>📋 إضافة سريعة</button>
+        <button onClick={openQuickAdd} style={{ ...ghostBtn, width: 'auto', padding: '11px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}><ClipboardList size={14} /> إضافة سريعة</button>
         <button onClick={() => { setEditing(null); setShowForm(true) }} style={{ ...primaryBtn, width: 'auto', padding: '11px 18px', whiteSpace: 'nowrap' }}>+ عمل</button>
       </div>
 
@@ -288,7 +356,7 @@ function WorksTab() {
             {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <label style={{ ...ghostBtn, display: 'block', textAlign: 'center', cursor: 'pointer', marginBottom: 10 }}>
-            📤 اختر الصور (يمكن تحديد أكثر من صورة)
+            <Upload size={14} /> اختر الصور (يمكن تحديد أكثر من صورة)
             <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { addQuickFiles(e.target.files); e.target.value = '' }} />
           </label>
 
@@ -307,7 +375,7 @@ function WorksTab() {
                       <input value={it.description} onChange={e => setQuickField(i, 'description', e.target.value)} placeholder="وصف بسيط يساعد على التمثيل" style={{ ...input, marginBottom: 0, flex: 2 }} />
                     </div>
                   </div>
-                  <button onClick={() => removeQuickItem(i)} style={{ ...ghostBtn, color: C.red, padding: '8px 10px', alignSelf: 'flex-start' }}>✕</button>
+                  <button onClick={() => removeQuickItem(i)} style={{ ...ghostBtn, color: C.red, padding: '8px 10px', alignSelf: 'flex-start', display: 'flex' }}><X size={14} /></button>
                 </div>
               ))}
             </div>
@@ -328,7 +396,7 @@ function WorksTab() {
         <Card key={w.id}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ width: 22, textAlign: 'center', fontWeight: 900, color: `${C.ink}55`, fontSize: 13 }}>{i + 1}</div>
-            {w.posterUrl ? <img src={w.posterUrl} alt="" width={40} height={54} style={{ borderRadius: 8, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 54, borderRadius: 8, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎬</div>}
+            {w.posterUrl ? <img src={w.posterUrl} alt="" width={40} height={54} style={{ borderRadius: 8, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 54, borderRadius: 8, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clapperboard size={18} color={`${C.ink}55`} /></div>}
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800 }}>{w.title}</div>
               <div style={{ fontSize: 12, color: `${C.ink}88` }}>{catName(w.categoryId)} · {[w.year, w.country].filter(Boolean).join(' · ')}</div>
@@ -371,7 +439,8 @@ function WorkForm({ cats, initial, onClose, onSaved }: { cats: WKCategory[]; ini
         <SectionTitle style={{ margin: 0 }}>{initial ? 'تعديل عمل' : 'عمل جديد'}</SectionTitle>
         <button onClick={onClose} style={ghostBtn}>إغلاق</button>
       </div>
-      <input value={f.title} onChange={e => set('title', e.target.value)} placeholder="اسم العمل *" style={input} />
+      <input value={f.title} onChange={e => set('title', e.target.value)}
+        placeholder={cats.find(c => c.id === f.categoryId)?.name.includes('أجنبية') ? 'اسم العمل (إنجليزي) *' : 'اسم العمل *'} style={input} />
       <select value={f.categoryId} onChange={e => set('categoryId', e.target.value)} style={input}>
         <option value="">اختر الفئة *</option>
         {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -392,8 +461,8 @@ function WorkForm({ cats, initial, onClose, onSaved }: { cats: WKCategory[]; ini
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
         <input value={f.posterUrl} onChange={e => set('posterUrl', e.target.value)} placeholder="رابط البوستر (أو ارفع)" style={{ ...input, flex: 1 }} />
-        <label style={{ ...ghostBtn, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {uploading ? '…' : '📤 رفع'}
+        <label style={{ ...ghostBtn, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+          {uploading ? '…' : <><Upload size={13} /> رفع</>}
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
         </label>
       </div>
@@ -481,7 +550,7 @@ function ImportTab() {
         <Muted>الأعمدة: title و category (اسم الفئة كما هو مسجّل، أو معرّفها) إلزامية. الباقي اختياري: poster, year, country, actors (افصل بـ ؛), info, difficulty.</Muted>
         <textarea value={text} onChange={e => setText(e.target.value)} placeholder={template} style={{ ...input, minHeight: 160, resize: 'vertical', fontFamily: 'monospace', direction: 'ltr', textAlign: 'left' }} />
         <div style={{ display: 'flex', gap: 8 }}>
-          <label style={{ ...ghostBtn, cursor: 'pointer' }}>📁 ملف CSV<input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={async e => { const file = e.target.files?.[0]; if (file) setText(await file.text()) }} /></label>
+          <label style={{ ...ghostBtn, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><FileText size={14} /> ملف CSV<input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={async e => { const file = e.target.files?.[0]; if (file) setText(await file.text()) }} /></label>
           <button onClick={() => setText(template)} style={ghostBtn}>قالب</button>
           <button onClick={run} disabled={busy} style={{ ...primaryBtn, flex: 1 }}>{busy ? 'جاري الاستيراد…' : 'استيراد'}</button>
         </div>
