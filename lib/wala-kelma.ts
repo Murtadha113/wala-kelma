@@ -1,7 +1,7 @@
 // محرّك "ولا كلمة" — Realtime Database على المسار: wala_kelma_rooms/{code}
 // شاشتان: المقدم (يكتب) + العرض (قراءة فقط). المؤقّت مشتق من phaseEndsAt (timestamp).
 import { ref, set, get, onValue, off, update, remove } from 'firebase/database'
-import { doc, writeBatch, increment } from 'firebase/firestore'
+import { doc, writeBatch, increment, addDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore'
 import { rtdb, db, serverNow } from './firebase'
 import { generateCode } from './code'
 import { pickRandomWork, WalaKelmaWork } from './works'
@@ -21,7 +21,7 @@ export interface WKPlayer { id: string; name: string }
 export interface WKTeam { name: string; score: number; players: WKPlayer[] }
 
 export type WKPhase =
-  | 'idle' | 'reading' | 'acting' | 'stealing' | 'resolved' | 'roundEnd' | 'finished'
+  | 'idle' | 'searching' | 'reading' | 'acting' | 'stealing' | 'resolved' | 'roundEnd' | 'finished'
 export type WKStatus = 'setup' | 'draw' | 'playing' | 'finished'
 
 export interface WKJokerState { outcome: JokerOutcome; ts: number }
@@ -42,6 +42,7 @@ export interface WalaKelmaRoom {
   status: WKStatus
   createdAt: number
   hostLastSeen?: number
+  redirectTo?: string | null   // كود مباراة جديدة — شاشة العرض تتابعه تلقائياً لو المقدّم بدأ مباراة جديدة
 
   matchName: string
   teams: Record<TeamId, WKTeam>
@@ -197,6 +198,11 @@ export async function updateWKHostHeartbeat(code: string): Promise<void> {
 
 export async function deleteWalaKelmaRoom(code: string): Promise<void> {
   await remove(ref(rtdb, `${ROOMS}/${code}`))
+}
+
+// يعلّم الغرفة القديمة بكود المباراة الجديدة — شاشة العرض المفتوحة عليها تتابعه تلقائياً
+export async function setRoomRedirect(code: string, redirectTo: string): Promise<void> {
+  await update(ref(rtdb, `${ROOMS}/${code}`), { redirectTo })
 }
 
 // ── الإعداد ──
@@ -381,8 +387,18 @@ export async function startTurn(code: string, uid: string, categoryId?: string):
   if (!snap.exists()) return { success: false, error: 'الغرفة غير موجودة' }
   const room = snap.val() as WalaKelmaRoom
   const drawFrom = categoryId && room.categories.includes(categoryId) ? [categoryId] : (room.categories || [])
-  const picked = await drawWorkForCategories(drawFrom, new Set(room.usedWorkIds || []), uid)
-  if (!picked) return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
+
+  // شاشة "جاري البحث عن سؤال" — تشويق بسيط بين الأسئلة، مو بالوضع السريع (يفضّل الإيقاع السريع)
+  if (room.mode !== 'quick') await update(ref(rtdb, `${ROOMS}/${code}`), { phase: 'searching' })
+
+  const [picked] = await Promise.all([
+    drawWorkForCategories(drawFrom, new Set(room.usedWorkIds || []), uid),
+    room.mode !== 'quick' ? new Promise(resolve => setTimeout(resolve, 2000)) : Promise.resolve(),
+  ])
+  if (!picked) {
+    await update(ref(rtdb, `${ROOMS}/${code}`), { phase: 'idle' })
+    return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
+  }
   const { current, exhausted } = picked
 
   const readSeconds = room.mode === 'quick' ? WK_QUICK_READ_SECONDS : WK_READ_SECONDS
@@ -626,6 +642,68 @@ export async function finishMatch(code: string, winner: TeamId | 'draw'): Promis
   // المضيف ما ينتمي فعلياً لفريق معيّن بهذا التصميم (يدير المباراة فقط) — نعتمد اصطلاحاً
   // إن نتيجة الفريق الأول (A) تمثّل نتيجة المضيف بلوحات الصدارة، لحين إضافة اختيار فريق المضيف صراحة
   await recordGroupResult(room.hostId, winner === 'draw' ? 'draw' : winner === 'A' ? 'win' : 'loss')
+  await recordMatchHistory(room, winner)
+}
+
+// ═══════════════ سجل المباريات ═══════════════
+export const MATCH_HISTORY = 'matchHistory'
+
+export interface MatchHistoryEntry {
+  id: string
+  matchName: string
+  categories: string[]
+  explainDuration: ExplainDuration
+  totalRounds: number
+  mode: 'full' | 'quick'
+  playerNamesEnabled: boolean
+  teams: Record<TeamId, { name: string; score: number; players: WKPlayer[] }>
+  winner: TeamId | 'draw'
+  finishedAt: number
+}
+
+// يحفظ ملخّص المباراة عند انتهائها — يُستخدم لعرض السجل و"إعادة اللعب مجاناً"
+async function recordMatchHistory(room: WalaKelmaRoom, winner: TeamId | 'draw'): Promise<void> {
+  try {
+    await addDoc(collection(db, 'users', room.hostId, MATCH_HISTORY), {
+      matchName: room.matchName, categories: room.categories,
+      explainDuration: room.explainDuration, totalRounds: room.totalRounds,
+      mode: room.mode, playerNamesEnabled: room.playerNamesEnabled,
+      teams: room.teams, winner, finishedAt: Date.now(),
+    })
+  } catch (e) {
+    console.error('recordMatchHistory:', e)
+  }
+}
+
+export async function getMatchHistory(hostId: string): Promise<MatchHistoryEntry[]> {
+  try {
+    const snap = await getDocs(query(collection(db, 'users', hostId, MATCH_HISTORY), orderBy('finishedAt', 'desc'), limit(30)))
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as MatchHistoryEntry))
+  } catch (e) {
+    console.error('getMatchHistory:', e)
+    return []
+  }
+}
+
+// يعيد إنشاء غرفة جديدة بنفس إعدادات مباراة قديمة من السجل — مجانية دايماً (already played once)
+export async function replayFromHistory(entry: MatchHistoryEntry, hostId: string, hostName: string): Promise<{ success: true; code: string } | { success: false; error: string }> {
+  const res = await createWalaKelmaRoom({ hostId, hostName })
+  if (!res.success) return res
+  const teams: Record<TeamId, WKTeam> = {
+    A: { name: entry.teams.A.name, score: 0, players: entry.playerNamesEnabled === false ? [] : entry.teams.A.players.map(p => ({ id: uidLocal(), name: p.name })) },
+    B: { name: entry.teams.B.name, score: 0, players: entry.playerNamesEnabled === false ? [] : entry.teams.B.players.map(p => ({ id: uidLocal(), name: p.name })) },
+  }
+  await updateMatchSetup(res.code, {
+    matchName: entry.matchName, teams, categories: entry.categories,
+    explainDuration: entry.explainDuration, totalRounds: entry.totalRounds,
+    mode: entry.mode, playerNamesEnabled: entry.playerNamesEnabled,
+  })
+  await update(ref(rtdb, `${ROOMS}/${res.code}`), { deductedFromBalance: true })   // مجانية — مسبق دفعها بالمباراة الأصلية
+  return { success: true, code: res.code }
+}
+
+function uidLocal(): string {
+  return `p_${Math.random().toString(36).slice(2, 9)}`
 }
 
 // يكتب إحصائيات كل لاعب على حساب المضيف — users/{hostUid}/players/{playerName}

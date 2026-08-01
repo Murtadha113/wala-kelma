@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { onAuthChange, getUserProfile, type UserProfile } from '@/lib/auth'
 import { getCategories, WKCategory } from '@/lib/works'
@@ -10,7 +10,7 @@ import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
   onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, undoJoker, togglePause, resetPhaseTimer,
-  toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, getBestActor,
+  toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, setRoomRedirect, getBestActor,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
 import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN, typeLabelForCategory } from '@/lib/wala-kelma-content'
@@ -26,8 +26,10 @@ import {
 const C = WK_COLORS
 const uid = () => `p_${Math.random().toString(36).slice(2, 9)}`
 
-export default function HostPage() {
+function HostPageInner() {
   const router = useRouter()
+  const params = useSearchParams()
+  const resumeCode = params.get('resume')
   const [profile, setProfile] = useState<UserProfile | null | 'loading'>('loading')
   const [room, setRoom] = useState<WalaKelmaRoom | null>(null)
   const [error, setError] = useState('')
@@ -43,14 +45,22 @@ export default function HostPage() {
   }, [router])
 
   useEffect(() => {
-    if (profile === 'loading' || !profile || creatingRef.current) return
+    if (profile === 'loading' || !profile) return
+    // "resume" = غرفة جديدة انسوّت مسبقاً (زر "مباراة جديدة" بعد مباراة سابقة) — نتصل فيها مباشرة بدون إنشاء وحدة زيادة.
+    // لازم تشتغل حتى لو "creatingRef" مسبوق: التنقّل لـ /host?resume=... يعيد رندر نفس الصفحة بدون remount
+    if (resumeCode) { setRoom(null); return subscribeToWalaKelmaRoom(resumeCode, r => { if (r) setRoom(r) }) }
+    if (creatingRef.current) return
     creatingRef.current = true
+    let unsub: (() => void) | undefined
+    let cancelled = false
     ;(async () => {
       const res = await createWalaKelmaRoom({ hostId: profile.id, hostName: profile.name })
       if (!res.success) { setError(res.error); return }
-      subscribeToWalaKelmaRoom(res.code, r => { if (r) setRoom(r) })
+      if (cancelled) return
+      unsub = subscribeToWalaKelmaRoom(res.code, r => { if (r) setRoom(r) })
     })()
-  }, [profile])
+    return () => { cancelled = true; unsub?.() }
+  }, [profile, resumeCode])
 
   useEffect(() => {
     if (!room?.code) return
@@ -74,10 +84,20 @@ export default function HostPage() {
         {room.status === 'setup' && <SetupWizard room={room} />}
         {room.status === 'draw' && <DrawScreen room={room} />}
         {room.status === 'playing' && <ControlPanel room={room} timeLeft={timeLeft} />}
-        {room.status === 'finished' && <FinishedScreen room={room} onNew={() => { deleteWalaKelmaRoom(room.code); location.reload() }} />}
+        {room.status === 'finished' && <FinishedScreen room={room} onNew={async () => {
+          const res = await createWalaKelmaRoom({ hostId: room.hostId, hostName: room.hostName })
+          if (!res.success) { deleteWalaKelmaRoom(room.code); location.reload(); return }
+          await setRoomRedirect(room.code, res.code)
+          await deleteWalaKelmaRoom(room.code)
+          router.push(`/host?resume=${res.code}`)
+        }} />}
       </div>
     </div>
   )
+}
+
+export default function HostPage() {
+  return <Suspense fallback={<Loading />}><HostPageInner /></Suspense>
 }
 
 // ═══════════════ SETUP ═══════════════
@@ -116,6 +136,20 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
     setAPlayers(a.length ? a : ['']); setBPlayers(b.length ? b : [''])
     setDistributed(true)
   }
+
+  // نبث نتيجة التوزيع العشوائي لشاشة العرض أول بأول، عشان الفريقين يتأكدون منها قبل بداية المباراة —
+  // ونحدّثها لو المقدّم عدّل الأسماء بعد التوزيع
+  useEffect(() => {
+    if (distMode !== 'random' || !distributed) return
+    const A = aPlayers.map(s => s.trim()).filter(Boolean)
+    const B = bPlayers.map(s => s.trim()).filter(Boolean)
+    updateMatchSetup(room.code, {
+      teams: {
+        A: { name: teamAName.trim() || 'الفريق الأول', score: 0, players: A.map(n => ({ id: uid(), name: n })) },
+        B: { name: teamBName.trim() || 'الفريق الثاني', score: 0, players: B.map(n => ({ id: uid(), name: n })) },
+      },
+    })
+  }, [distMode, distributed, aPlayers, bPlayers, teamAName, teamBName, room.code])
 
   const start = async () => {
     setErr('')
@@ -418,6 +452,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const [silencePick, setSilencePick] = useState(false)
   const [turnErr, setTurnErr] = useState('')
   const [endConfirm, setEndConfirm] = useState(false)
+  const [scoreConfirm, setScoreConfirm] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null)
   const [cats, setCats] = useState<WKCategory[]>([])
   const w = room.currentWork
 
@@ -515,6 +550,13 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         </>
       )}
 
+      {room.phase === 'searching' && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', border: `4px solid ${C.violet}30`, borderTopColor: C.violet, animation: 'wkspin 0.8s linear infinite' }} />
+          <style>{`@keyframes wkspin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      )}
+
       {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && w && (
         <>
           {room.categoryExhausted && (
@@ -532,7 +574,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
                 {w.posterUrl ? <img src={w.posterUrl} alt="" width={150} style={{ borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 150, height: 206, borderRadius: 16, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clapperboard size={40} color={`${C.ink}44`} /></div>}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   {typeLabel && <div style={{ fontSize: 13, fontWeight: 800, color: C.violet, marginBottom: 4 }}>{typeLabel}</div>}
-                  <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.2 }}>{w.title}</div>
+                  <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.4 }}>{w.title}</div>
                   <div style={{ fontSize: 14, color: `${C.ink}99`, marginTop: 8 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
                 </div>
               </div>
@@ -543,15 +585,15 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
           {room.phase === 'acting' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => markCorrect(room.code, team)} style={successBtn}>صح ({room.teams[team].name})</button>
-              <button onClick={() => markWrong(room.code)} style={dangerBtn}>غلط → سرقة</button>
+              <button onClick={() => setScoreConfirm({ title: `صح لـ ${room.teams[team].name}؟`, desc: 'بتنحسب نقطة (أو نقطتين لو مفعّلة المضاعفة) لهذا الفريق.', onConfirm: () => markCorrect(room.code, team) })} style={successBtn}>صح ({room.teams[team].name})</button>
+              <button onClick={() => setScoreConfirm({ title: 'غلط؟', desc: `ينتقل الدور للسرقة — ${room.teams[other].name} يقدر يخمّن.`, onConfirm: () => markWrong(room.code) })} style={dangerBtn}>غلط → سرقة</button>
             </div>
           )}
 
           {room.phase === 'stealing' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => markCorrect(room.code, other)} style={{ ...successBtn, background: C.red }}>سرقها {room.teams[other].name}</button>
-              <button onClick={() => onStealTimeUp(room.code)} style={dangerBtn}>ما خمّنوا</button>
+              <button onClick={() => setScoreConfirm({ title: `سرقها ${room.teams[other].name}؟`, desc: 'بتنحسب نقطة لهذا الفريق.', onConfirm: () => markCorrect(room.code, other) })} style={{ ...successBtn, background: C.red }}>سرقها {room.teams[other].name}</button>
+              <button onClick={() => setScoreConfirm({ title: 'ما خمّنوا؟', desc: 'ينتهي الدور بدون أي نقطة.', onConfirm: () => onStealTimeUp(room.code) })} style={dangerBtn}>ما خمّنوا</button>
             </div>
           )}
 
@@ -600,6 +642,15 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           desc="بتنتهي المباراة الحين بالنتيجة الحالية — ما تقدر ترجع."
           onCancel={() => setEndConfirm(false)}
           onConfirm={() => { setEndConfirm(false); cancelMatch(room.code) }}
+        />
+      )}
+
+      {scoreConfirm && (
+        <ConfirmModal
+          title={scoreConfirm.title}
+          desc={scoreConfirm.desc}
+          onCancel={() => setScoreConfirm(null)}
+          onConfirm={() => { const fn = scoreConfirm.onConfirm; setScoreConfirm(null); fn() }}
         />
       )}
     </div>
@@ -680,9 +731,15 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
         </div>
       )}
       <ShareResultButton room={room} refUid={room.hostId} />
-      <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 280 }}>
-        <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]" style={{ ...primaryBtn, flex: 1 }}>مباراة جديدة</button>
-        <a href="/" style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none' }}><ArrowLeft size={14} /> الرئيسية</a>
+      <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 360 }}>
+        <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
+          style={{ flex: 1.4, padding: '13px 10px', borderRadius: 12, border: 'none', color: '#fff', fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap',
+            background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 8px 18px ${C.red}2a` }}>
+          مباراة جديدة
+        </button>
+        <a href="/" style={{ flex: 1, padding: '13px 10px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none' }}>
+          <ArrowLeft size={13} /> الرئيسية
+        </a>
       </div>
     </div>
   )

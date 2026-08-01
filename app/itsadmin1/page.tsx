@@ -353,7 +353,7 @@ function WorksTab() {
           <Muted>اختر الفئة، وارفع صور كل الأعمال دفعة وحدة (مثلاً 100 بوستر فيلم) — كل صورة تصير عمل جديد فيه اسمه ووصف بسيط عنه (البلد ولمحة تساعد اللاعب يمثّله). الاسم يتعبّى تلقائياً من اسم الملف وتقدر تعدّله.</Muted>
           <select value={quickCat} onChange={e => setQuickCat(e.target.value)} style={input}>
             <option value="">اختر الفئة *</option>
-            {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
           </select>
           <label style={{ ...ghostBtn, display: 'block', textAlign: 'center', cursor: 'pointer', marginBottom: 10 }}>
             <Upload size={14} /> اختر الصور (يمكن تحديد أكثر من صورة)
@@ -389,7 +389,7 @@ function WorksTab() {
         </Card>
       )}
 
-      {(showForm || editing) && <WorkForm cats={cats} initial={editing} onClose={() => { setShowForm(false); setEditing(null) }} onSaved={() => { setShowForm(false); setEditing(null); reload() }} />}
+      {(showForm || editing) && <WorkForm cats={cats} works={works} initial={editing} onClose={() => { setShowForm(false); setEditing(null) }} onSaved={() => { setShowForm(false); setEditing(null); reload() }} />}
 
       {filtered.length === 0 && <Card><Muted>لا توجد أعمال. أضف أعمالاً بصورها أو استخدم الإضافة السريعة بالصور أو استيراد CSV.</Muted></Card>}
       {filtered.map((w, i) => (
@@ -411,7 +411,7 @@ function WorksTab() {
   )
 }
 
-function WorkForm({ cats, initial, onClose, onSaved }: { cats: WKCategory[]; initial: WalaKelmaWork | null; onClose: () => void; onSaved: () => void }) {
+function WorkForm({ cats, works, initial, onClose, onSaved }: { cats: WKCategory[]; works: WalaKelmaWork[]; initial: WalaKelmaWork | null; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState<NewWork>(initial ? { ...initial } : { ...EMPTY_FORM, categoryId: cats[0]?.id || '' })
   const [actorsStr, setActorsStr] = useState((initial?.actors || []).join('، '))
   const [busy, setBusy] = useState(false)
@@ -443,7 +443,7 @@ function WorkForm({ cats, initial, onClose, onSaved }: { cats: WKCategory[]; ini
         placeholder={cats.find(c => c.id === f.categoryId)?.name.includes('أجنبية') ? 'اسم العمل (إنجليزي) *' : 'اسم العمل *'} style={input} />
       <select value={f.categoryId} onChange={e => set('categoryId', e.target.value)} style={input}>
         <option value="">اختر الفئة *</option>
-        {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
       </select>
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={f.year ?? ''} onChange={e => set('year', e.target.value ? Number(e.target.value) : null)} placeholder="السنة" style={input} type="number" />

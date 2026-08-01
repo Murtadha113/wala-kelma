@@ -82,8 +82,8 @@ export function ShareResultButton({ room, refUid }: { room: WalaKelmaRoom; refUi
 
       {!imgUrl ? (
         <button onClick={generate} disabled={busy} style={{
-          width: '100%', padding: 13, borderRadius: 12, border: `1.5px solid ${C.violet}55`, background: `${C.violet}0d`,
-          color: C.violet, fontWeight: 800, fontSize: 14, cursor: 'pointer', opacity: busy ? 0.6 : 1,
+          width: '100%', maxWidth: 360, padding: '12px 10px', borderRadius: 12, border: `1.5px solid ${C.violet}55`, background: `${C.violet}0d`,
+          color: C.violet, fontWeight: 800, fontSize: 13.5, cursor: 'pointer', opacity: busy ? 0.6 : 1,
         }}>
           {busy ? 'جاري التجهيز…' : 'شارك النتيجة'}
         </button>

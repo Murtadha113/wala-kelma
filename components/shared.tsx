@@ -94,6 +94,7 @@ export function phaseTotal(room: WalaKelmaRoom): number {
 
 export const PHASE_LABEL: Record<WKPhase, string> = {
   idle: 'استعداد',
+  searching: 'جاري البحث عن سؤال...',
   reading: 'وقت القراءة',
   acting: 'وقت التمثيل',
   stealing: 'فرصة السرقة!',

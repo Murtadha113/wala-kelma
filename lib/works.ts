@@ -175,8 +175,13 @@ export async function pickRandomWork(
       return { work, exhausted: false }
     }
 
-    // مستوى 3: نفدت الأعمال الجديدة — رجّع الأقدم مشاهدة (cooldown)
-    const oldest = [...notUsedThisMatch].sort((a, b) => (seenMap.get(a.id) ?? 0) - (seenMap.get(b.id) ?? 0))[0]
+    // مستوى 3: نفدت الأعمال الجديدة — نرجّع من بين الأقدم مشاهدة (cooldown)، عشوائياً بينهم
+    // مو الأقدم نفسه دايماً: لو أعمال نفس الفئة انزرعت/انشافت مع بعض بنفس الوقت تقريباً، فرزها الحرفي
+    // كان يخلّي كل فئة تطلع كتلة وحدة ورا بعض بدل ما تتوزّع عشوائياً بالمباراة
+    const sorted = [...notUsedThisMatch].sort((a, b) => (seenMap.get(a.id) ?? 0) - (seenMap.get(b.id) ?? 0))
+    const poolSize = Math.max(1, Math.ceil(sorted.length * 0.3))
+    const pool = sorted.slice(0, poolSize)
+    const oldest = pool[Math.floor(Math.random() * pool.length)]
     if (uid) await markWorkSeen(uid, oldest.id, oldest.categoryId)
     return { work: oldest, exhausted: true }
   } catch (e) {

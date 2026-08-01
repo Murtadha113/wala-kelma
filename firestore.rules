@@ -35,6 +35,11 @@ service cloud.firestore {
         allow read: if isSelf(uid) || isAdmin();
         allow write: if isSelf(uid);
       }
+
+      // ── سجل المباريات (خاص بكل مستخدم) — لعرض السجل وإعادة اللعب مجاناً ──
+      match /matchHistory/{matchId} {
+        allow read, write: if isSelf(uid);
+      }
     }
 
     // ── منع تكرار المحتوى (خاص بكل مستخدم) ──

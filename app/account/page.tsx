@@ -8,7 +8,8 @@ import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, typ
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 import { GradientBlobs } from '@/components/shared'
-import { ArrowLeft, Gift, CreditCard, Trophy, Star, Check, RefreshCw } from 'lucide-react'
+import { BottomNav } from '@/components/bottom-nav'
+import { Gift, CreditCard, Trophy, Star, Check, RefreshCw } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -40,9 +41,8 @@ export default function AccountPage() {
     <div dir="rtl" style={{ minHeight: '100dvh', background: C.cream, color: C.ink, position: 'relative', overflow: 'hidden' }}>
       <GradientBlobs />
       <div style={{ position: 'relative', maxWidth: 440, margin: '0 auto', padding: '20px 16px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
           <Logo height={30} />
-          <a href="/" style={{ fontSize: 13, color: `${C.ink}88`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={13} /> الرئيسية</a>
         </div>
 
         <Card>
@@ -97,7 +97,16 @@ export default function AccountPage() {
         }} style={{ width: '100%', marginTop: 10, padding: 12, borderRadius: 12, border: 'none', background: 'transparent', color: `${C.red}99`, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
           حذف الحساب نهائياً
         </button>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, fontSize: 11, color: `${C.ink}55`, marginTop: 24 }}>
+          <a href="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>الشروط والأحكام</a>
+          <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>الخصوصية</a>
+          <a href="/refund" style={{ color: 'inherit', textDecoration: 'none' }}>الاسترجاع</a>
+          <a href="/contact" style={{ color: 'inherit', textDecoration: 'none' }}>تواصل معنا</a>
+        </div>
       </div>
+
+      <BottomNav />
     </div>
   )
 }

@@ -28,6 +28,8 @@ function DisplayInner() {
   const [hostAway, setHostAway] = useState(false)
   const [tiebreakBanner, setTiebreakBanner] = useState(false)
   const wasTiebreak = useRef(false)
+  const [newGameOpen, setNewGameOpen] = useState(false)
+  const [newGameCode, setNewGameCode] = useState('')
 
   useEffect(() => {
     if (!code) { router.replace('/'); return }
@@ -38,6 +40,11 @@ function DisplayInner() {
     })
     return () => unsub()
   }, [code])
+
+  // المقدّم بدأ مباراة جديدة — نتابعها تلقائياً بدون ما نحتاج نعيد فتح الرابط يدوياً
+  useEffect(() => {
+    if (room?.redirectTo) router.replace(`/display?code=${room.redirectTo}`)
+  }, [room?.redirectTo, router])
 
   useEffect(() => { getCategories().then(setCats) }, [])
 
@@ -97,6 +104,24 @@ function DisplayInner() {
         <span style={{ color: `${C.ink}88`, fontWeight: 700 }}>كود المباراة</span>
         <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: '0.3em', color: C.violet }}>{room.code}</span>
       </div>
+      {(room.teams.A.players.length > 0 || room.teams.B.players.length > 0) && (
+        <div className="wk-pop-in" style={{ marginTop: 22, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+          {(['A', 'B'] as TeamId[]).map(id => (
+            <div key={id} style={{
+              background: '#fff', borderRadius: 18, padding: '16px 22px', minWidth: 180,
+              border: `2px solid ${id === 'A' ? C.violet : C.red}33`,
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: id === 'A' ? C.violet : C.red }}>{room.teams[id].name}</div>
+              <div style={{ fontSize: 11, color: `${C.ink}66`, fontWeight: 700, marginTop: 2 }}>توزيع عشوائي — تقدرون تعدّلونه قبل البداية</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                {room.teams[id].players.map(p => (
+                  <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{p.name}</div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div></Center>
   }
 
@@ -123,6 +148,21 @@ function DisplayInner() {
             <span style={{ fontSize: 20, fontWeight: 900, color: C.orange }}>{bestActor.playerName}</span>
           </div>
         )}
+        <div style={{ marginTop: 30 }}>
+          {!newGameOpen ? (
+            <button onClick={() => setNewGameOpen(true)} style={{
+              padding: '12px 26px', borderRadius: 999, border: `1.5px solid ${C.ink}22`, background: '#fff',
+              color: `${C.ink}cc`, fontWeight: 800, fontSize: 15, cursor: 'pointer',
+            }}>مباراة جديدة</button>
+          ) : (
+            <form onSubmit={e => { e.preventDefault(); const c = newGameCode.trim().toUpperCase(); if (c) router.push(`/display?code=${c}`) }}
+              style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+              <input autoFocus value={newGameCode} onChange={e => setNewGameCode(e.target.value)} placeholder="كود المباراة الجديدة"
+                style={{ padding: '12px 16px', borderRadius: 12, border: `1.5px solid ${C.violet}55`, fontSize: 16, fontWeight: 800, textAlign: 'center', letterSpacing: '0.15em', width: 200 }} />
+              <button type="submit" style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: C.violet, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>دخول</button>
+            </form>
+          )}
+        </div>
       </div>
     </Center>
   }
@@ -194,7 +234,13 @@ function DisplayInner() {
             </div>
           </div>
         )}
-        {!stealing && <>
+        {room.phase === 'searching' && (
+          <div className="wk-pop-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 'clamp(50px, 6vw, 84px)', height: 'clamp(50px, 6vw, 84px)', borderRadius: '50%', border: `6px solid ${C.violet}25`, borderTopColor: C.violet, animation: 'wkspin 0.8s linear infinite' }} />
+            <div style={{ fontSize: 'clamp(18px, 2.4vw, 32px)', fontWeight: 800, color: `${C.ink}aa` }}>{PHASE_LABEL.searching}</div>
+          </div>
+        )}
+        {!stealing && room.phase !== 'resolved' && room.phase !== 'searching' && <>
           <div style={{ fontSize: 'clamp(15px, 2vw, 26px)', color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 'clamp(28px, 4.6vw, 68px)', fontWeight: 900, color: activeColor, textAlign: 'center' }}>{room.teams[room.activeTeam].name}</div>
           {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 'clamp(17px, 2.4vw, 32px)', fontWeight: 700, color: C.ink, textAlign: 'center' }}>يمثّل الآن: {slot.playerName}</div>}
@@ -208,34 +254,39 @@ function DisplayInner() {
           </div>
         )}
 
+        {room.joker && (room.phase === 'acting' || room.phase === 'reading') && (
+          <div style={{ fontSize: 'clamp(13px, 1.8vw, 22px)', fontWeight: 800, color: C.orange, background: `${C.orange}14`, padding: '6px 14px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Dices size={16} /> الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
+          </div>
+        )}
+
         {timed && <TimerRing timeLeft={timeLeft} total={phaseTotal(room)} danger={room.phase === 'stealing'} />}
 
         {room.phase === 'resolved' && room.lastResult && (
           <>
-            <Confetti key={room.lastResult.ts} count={14} active={room.lastResult.points > 0} />
-            <div key={room.lastResult.ts} className="wk-pop-in" style={{ fontSize: 'clamp(20px, 3.2vw, 46px)', fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : `${C.ink}88`, textAlign: 'center' }}>
+            <Confetti key={`c-${room.lastResult.ts}`} count={14} active={room.lastResult.points > 0} />
+            <div key={`r-${room.lastResult.ts}`} className="wk-pop-in" style={{ fontSize: 'clamp(24px, 3.8vw, 52px)', fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : `${C.ink}88`, textAlign: 'center' }}>
               {room.lastResult.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'steal' && `🥷 سرقة! نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
             </div>
             {room.currentWork && (
-              <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 18, padding: 14, border: `1px solid ${C.ink}12`, boxShadow: `0 12px 30px ${C.ink}12` }}>
-                {room.currentWork.posterUrl && <img src={room.currentWork.posterUrl} alt="" width={64} style={{ borderRadius: 10, objectFit: 'cover' }} />}
-                <div>
+              <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(18px, 2.6vw, 34px)', background: '#fff', borderRadius: 26, padding: 'clamp(18px, 2.4vw, 30px)', border: `1px solid ${C.ink}12`, boxShadow: `0 14px 34px ${C.ink}14`, maxWidth: 780 }}>
+                {room.currentWork.posterUrl && <img src={room.currentWork.posterUrl} alt="" style={{ width: 'clamp(100px, 13vw, 190px)', height: 'clamp(140px, 18vw, 260px)', borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} />}
+                <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 'clamp(11px, 1.2vw, 15px)', color: `${C.ink}77`, fontWeight: 700 }}>الإجابة الصحيحة</div>
-                  <div style={{ fontSize: 'clamp(17px, 2.4vw, 30px)', fontWeight: 900, color: C.ink }}>{room.currentWork.title}</div>
+                  <div style={{ fontSize: 'clamp(30px, 5vw, 64px)', fontWeight: 900, color: C.ink, lineHeight: 1.35 }}>{room.currentWork.title}</div>
+                  {(room.currentWork.year || room.currentWork.country) && (
+                    <div style={{ fontSize: 'clamp(12px, 1.4vw, 16px)', color: `${C.ink}77`, fontWeight: 700, marginTop: 4 }}>
+                      {[room.currentWork.year, room.currentWork.country].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </>
         )}
         {room.phase === 'roundEnd' && <DisplayRoundEndSummary room={room} />}
-
-        {room.joker && (room.phase === 'acting' || room.phase === 'reading') && (
-          <div style={{ fontSize: 'clamp(15px, 2vw, 26px)', fontWeight: 800, color: C.orange, background: `${C.orange}18`, padding: '8px 16px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Dices size={20} /> الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
-          </div>
-        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

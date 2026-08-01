@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation'
 import { onAuthChange, type UserProfile, getUserProfile } from '@/lib/auth'
 import { WK_COLORS, WK_POWERUPS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
+import { BottomNav } from '@/components/bottom-nav'
 import { getBanners, type BannerItem } from '@/lib/banners'
 import {
   Clapperboard, Tv, Drama, VolumeX, Zap, Swords,
-  Smartphone, PartyPopper, HelpCircle, X, User, Gamepad2, ChevronDown,
+  Smartphone, HelpCircle, X, User, Gamepad2, ChevronDown,
 } from 'lucide-react'
 
 const C = WK_COLORS
@@ -52,7 +53,8 @@ function BannerCarousel({ items }: { items: BannerItem[] }) {
     return () => clearInterval(t)
   }, [items.length])
 
-  const img = <img src={items[i].imageUrl} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 18, display: 'block' }} />
+  // نسبة ثابتة 7:3 (تطابق أبعاد صور البنر الحالية 2688×1152) بدل ارتفاع ثابت — يعرض الصورة كاملة بلا قص، وبنفس الشكل على كل الشاشات
+  const img = <img src={items[i].imageUrl} alt="" style={{ width: '100%', aspectRatio: '7 / 3', objectFit: 'cover', borderRadius: 18, display: 'block' }} />
   return (
     <div style={{ marginTop: 14 }}>
       {items[i].linkUrl ? <a href={items[i].linkUrl} style={{ display: 'block' }}>{img}</a> : img}
@@ -255,32 +257,7 @@ export default function LandingPage() {
         </InfoModal>
       )}
 
-      {/* ── دعوة ختامية ── */}
-      <section style={{ maxWidth: 640, margin: '0 auto', padding: '10px 20px 40px', textAlign: 'center' }}>
-        <div style={{ background: `linear-gradient(135deg, ${C.violet}, #4726c9)`, borderRadius: 24, padding: '28px 24px', color: '#fff' }}>
-          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            جهّز الشلة وابدأوا الآن <PartyPopper size={22} />
-          </div>
-          <p style={{ fontSize: 13, opacity: 0.9, marginBottom: 18 }}>لعبة مجانية أول تسجيل</p>
-          <button onClick={() => router.push(profile ? '/host' : '/signup')}
-            className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
-            style={{ background: '#fff', color: C.violet, border: 'none', borderRadius: 14, padding: '14px 32px', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>
-            {profile ? 'ابدأ اللعب' : 'جرّبها مجاناً'}
-          </button>
-        </div>
-      </section>
-
-      {/* ── فوتر ── */}
-      <footer style={{ borderTop: `1px solid ${C.ink}0d`, padding: '20px 20px 32px' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, fontSize: 11, color: `${C.ink}55` }}>
-            <a href="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>الشروط والأحكام</a>
-            <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>الخصوصية</a>
-            <a href="/refund" style={{ color: 'inherit', textDecoration: 'none' }}>الاسترجاع</a>
-            <a href="/contact" style={{ color: 'inherit', textDecoration: 'none' }}>تواصل معنا</a>
-          </div>
-        </div>
-      </footer>
+      <BottomNav />
     </div>
   )
 }
