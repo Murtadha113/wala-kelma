@@ -8,7 +8,7 @@ import {
 } from '@/lib/wala-kelma'
 import { serverNow } from '@/lib/firebase'
 import { WK_COLORS, WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_POWERUPS } from '@/lib/wala-kelma-content'
-import { playCorrectSound, playWrongSound, playWinSound, playStealSound, playTickSound } from '@/lib/sound'
+import { playCorrectSound, playWrongSound, playWinSound, playStealSound, playTickSound, playTimerStartSound, playTimerEndSound } from '@/lib/sound'
 
 const C = WK_COLORS
 
@@ -180,6 +180,22 @@ export function PowerUpsGrid({ room, teamId }: { room: WalaKelmaRoom; teamId: Te
       })}
     </div>
   )
+}
+
+// صوت بدء وقت التمثيل وانتهائه — يُستمع لتغيّر المرحلة بالغرفة (يشتغل بشاشة المقدّم وشاشة العرض معاً)
+export function useTimerSounds(room: WalaKelmaRoom | null, muted = false) {
+  const prevPhase = useRef<WKPhase | null>(null)
+  useEffect(() => {
+    if (!room) return
+    const prev = prevPhase.current
+    if (prev !== room.phase) {
+      if (!muted) {
+        if (room.phase === 'acting' && prev === 'reading') playTimerStartSound()
+        else if (prev === 'acting' && (room.phase === 'stealing' || room.phase === 'resolved')) playTimerEndSound()
+      }
+      prevPhase.current = room.phase
+    }
+  }, [room?.phase, muted])
 }
 
 export function useResultSounds(room: WalaKelmaRoom | null, muted = false) {

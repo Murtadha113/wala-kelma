@@ -23,7 +23,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState<'dashboard' | 'works' | 'categories' | 'banners' | 'import' | 'orders' | 'users' | 'packages' | 'coupons' | 'settings'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'works' | 'categories' | 'banners' | 'import' | 'scrape' | 'orders' | 'users' | 'packages' | 'coupons' | 'settings'>('dashboard')
 
   useEffect(() => onAuthChange(async user => {
     if (!user) { setGate('signedOut'); return }
@@ -91,7 +91,7 @@ export default function AdminPage() {
 
         <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, marginBottom: 16, flexWrap: 'wrap' }}>
           {([
-            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['banners', 'البنر'], ['import', 'استيراد CSV'],
+            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['banners', 'البنر'], ['import', 'استيراد CSV'], ['scrape', 'سحب أعمال'],
             ['orders', 'الطلبات'], ['users', 'المستخدمون'], ['packages', 'الباقات'], ['coupons', 'الكوبونات'], ['settings', 'الإعدادات'],
           ] as const).map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)} style={{
@@ -107,6 +107,7 @@ export default function AdminPage() {
         {tab === 'categories' && <CategoriesTab />}
         {tab === 'banners' && <BannersTab />}
         {tab === 'import' && <ImportTab />}
+        {tab === 'scrape' && <ScrapeTab />}
         {tab === 'orders' && <OrdersTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'packages' && <PackagesAdminTab />}
@@ -434,41 +435,45 @@ function WorkForm({ cats, works, initial, onClose, onSaved }: { cats: WKCategory
   }
 
   return (
-    <Card>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <SectionTitle style={{ margin: 0 }}>{initial ? 'تعديل عمل' : 'عمل جديد'}</SectionTitle>
-        <button onClick={onClose} style={ghostBtn}>إغلاق</button>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 90, padding: '5vh 16px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460 }}>
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <SectionTitle style={{ margin: 0 }}>{initial ? 'تعديل عمل' : 'عمل جديد'}</SectionTitle>
+            <button onClick={onClose} style={ghostBtn}>إغلاق</button>
+          </div>
+          <input value={f.title} onChange={e => set('title', e.target.value)}
+            placeholder={cats.find(c => c.id === f.categoryId)?.name.includes('أجنبية') ? 'اسم العمل (إنجليزي) *' : 'اسم العمل *'} style={input} />
+          <select value={f.categoryId} onChange={e => set('categoryId', e.target.value)} style={input}>
+            <option value="">اختر الفئة *</option>
+            {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={f.year ?? ''} onChange={e => set('year', e.target.value ? Number(e.target.value) : null)} placeholder="السنة" style={input} type="number" />
+            <input value={f.country ?? ''} onChange={e => set('country', e.target.value || null)} placeholder="البلد" style={input} />
+          </div>
+          <input value={actorsStr} onChange={e => setActorsStr(e.target.value)} placeholder="الممثلون (افصل بفاصلة)" style={input} />
+          <textarea value={f.extraInfo} onChange={e => set('extraInfo', e.target.value)} placeholder="معلومات إضافية تساعد على التمثيل" style={{ ...input, minHeight: 60, resize: 'vertical' }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select value={f.difficulty} onChange={e => set('difficulty', e.target.value as Difficulty)} style={{ ...input, flex: 1 }}>
+              <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
+            </select>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={f.isActive} onChange={e => set('isActive', e.target.checked)} /> مفعّل
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+            <input value={f.posterUrl} onChange={e => set('posterUrl', e.target.value)} placeholder="رابط البوستر (أو ارفع)" style={{ ...input, flex: 1 }} />
+            <label style={{ ...ghostBtn, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {uploading ? '…' : <><Upload size={13} /> رفع</>}
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
+            </label>
+          </div>
+          {f.posterUrl && <img src={f.posterUrl} alt="" style={{ width: 60, borderRadius: 8, marginTop: 8 }} />}
+          <button onClick={save} disabled={busy} style={{ ...primaryBtn, marginTop: 10 }}>{busy ? '…' : 'حفظ'}</button>
+        </Card>
       </div>
-      <input value={f.title} onChange={e => set('title', e.target.value)}
-        placeholder={cats.find(c => c.id === f.categoryId)?.name.includes('أجنبية') ? 'اسم العمل (إنجليزي) *' : 'اسم العمل *'} style={input} />
-      <select value={f.categoryId} onChange={e => set('categoryId', e.target.value)} style={input}>
-        <option value="">اختر الفئة *</option>
-        {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
-      </select>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={f.year ?? ''} onChange={e => set('year', e.target.value ? Number(e.target.value) : null)} placeholder="السنة" style={input} type="number" />
-        <input value={f.country ?? ''} onChange={e => set('country', e.target.value || null)} placeholder="البلد" style={input} />
-      </div>
-      <input value={actorsStr} onChange={e => setActorsStr(e.target.value)} placeholder="الممثلون (افصل بفاصلة)" style={input} />
-      <textarea value={f.extraInfo} onChange={e => set('extraInfo', e.target.value)} placeholder="معلومات إضافية تساعد على التمثيل" style={{ ...input, minHeight: 60, resize: 'vertical' }} />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={f.difficulty} onChange={e => set('difficulty', e.target.value as Difficulty)} style={{ ...input, flex: 1 }}>
-          <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
-        </select>
-        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, whiteSpace: 'nowrap' }}>
-          <input type="checkbox" checked={f.isActive} onChange={e => set('isActive', e.target.checked)} /> مفعّل
-        </label>
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-        <input value={f.posterUrl} onChange={e => set('posterUrl', e.target.value)} placeholder="رابط البوستر (أو ارفع)" style={{ ...input, flex: 1 }} />
-        <label style={{ ...ghostBtn, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
-          {uploading ? '…' : <><Upload size={13} /> رفع</>}
-          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
-        </label>
-      </div>
-      {f.posterUrl && <img src={f.posterUrl} alt="" style={{ width: 60, borderRadius: 8, marginTop: 8 }} />}
-      <button onClick={save} disabled={busy} style={{ ...primaryBtn, marginTop: 10 }}>{busy ? '…' : 'حفظ'}</button>
-    </Card>
+    </div>
   )
 }
 
@@ -556,6 +561,142 @@ function ImportTab() {
         </div>
         {log && <div style={{ marginTop: 10, fontWeight: 800, color: C.violet }}>{log}</div>}
       </Card>
+    </div>
+  )
+}
+
+// ═══════════════ سحب الأعمال من موقع ═══════════════
+interface ScrapedItem { name: string; type: string; url: string | null; page?: number; selected: boolean; posterUrl?: string }
+
+function ScrapeTab() {
+  const [cats, setCats] = useState<WKCategory[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [urlPattern, setUrlPattern] = useState('')
+  const [startPage, setStartPage] = useState(1)
+  const [endPage, setEndPage] = useState(1)
+  const [scraping, setScraping] = useState(false)
+  const [items, setItems] = useState<ScrapedItem[]>([])
+  const [errors, setErrors] = useState<string[]>([])
+  const [enriching, setEnriching] = useState(false)
+  const [enrichDone, setEnrichDone] = useState(0)
+  const [importing, setImporting] = useState(false)
+  const [importDone, setImportDone] = useState(0)
+  const [log, setLog] = useState('')
+
+  useEffect(() => { getCategories().then(cs => { setCats(cs); setCategoryId(cs[0]?.id || '') }) }, [])
+
+  const selectedCount = items.filter(it => it.selected).length
+
+  const runScrape = async () => {
+    setScraping(true); setErrors([]); setItems([]); setLog('')
+    try {
+      const resp = await fetch('/api/wk-scrape', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urlPattern, startPage, endPage }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
+      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: true })))
+      setErrors(data.errors || [])
+    } catch (e) {
+      setErrors([(e as Error).message])
+    }
+    setScraping(false)
+  }
+
+  const toggleSelect = (i: number) => setItems(prev => prev.map((it, idx) => idx === i ? { ...it, selected: !it.selected } : it))
+  const setName = (i: number, v: string) => setItems(prev => prev.map((it, idx) => idx === i ? { ...it, name: v } : it))
+  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i))
+
+  const runEnrich = async () => {
+    const targets = items.filter(it => it.selected && it.url && !it.posterUrl)
+    if (targets.length === 0) return
+    setEnriching(true); setEnrichDone(0)
+    const BATCH = 20
+    for (let i = 0; i < targets.length; i += BATCH) {
+      const chunk = targets.slice(i, i + BATCH)
+      try {
+        const resp = await fetch('/api/wk-enrich', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: chunk.map(c => ({ name: c.name, url: c.url })) }),
+        })
+        const data = await resp.json()
+        if (resp.ok) {
+          const byUrl = new Map<string, string>((data.items || []).map((it: { url: string; image: string }) => [it.url, it.image]))
+          setItems(prev => prev.map(it => (it.url && byUrl.has(it.url)) ? { ...it, posterUrl: byUrl.get(it.url) || '' } : it))
+        }
+      } catch { /* تجاهل الدفعة الفاشلة واستمر بالباقي */ }
+      setEnrichDone(d => d + chunk.length)
+    }
+    setEnriching(false)
+  }
+
+  const runImport = async () => {
+    if (!categoryId) { alert('اختر الفئة'); return }
+    const targets = items.filter(it => it.selected && it.name.trim())
+    if (targets.length === 0) return
+    setImporting(true); setImportDone(0)
+    let ok = 0
+    for (const it of targets) {
+      try {
+        await addWork({
+          title: it.name.trim(), categoryId, posterUrl: it.posterUrl || '',
+          year: null, country: null, actors: [], extraInfo: '', difficulty: 'medium', isActive: true,
+        })
+        ok++
+      } catch { /* تجاهل الفشل واستمر بالباقي */ }
+      setImportDone(d => d + 1)
+    }
+    setLog(`تمت إضافة ${ok} من ${targets.length} للفئة "${cats.find(c => c.id === categoryId)?.name || ''}".`)
+    setItems(prev => prev.filter(it => !it.selected))
+    setImporting(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Card>
+        <SectionTitle>سحب أعمال من موقع</SectionTitle>
+        <Muted>يسحب أسماء الأعمال (وتخمين نوعها) من موقع، ثم تقدر تستخرج صورها وتضيفها كلها مباشرة لفئة تختارها — بدون ملفات Excel.</Muted>
+        <input value={urlPattern} onChange={e => setUrlPattern(e.target.value)} placeholder="https://example.com/movies/page/{page}/" style={{ ...input, direction: 'ltr', textAlign: 'left' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="number" min={1} value={startPage} onChange={e => setStartPage(Number(e.target.value) || 1)} placeholder="من صفحة" style={input} />
+          <input type="number" min={1} value={endPage} onChange={e => setEndPage(Number(e.target.value) || 1)} placeholder="إلى صفحة" style={input} />
+        </div>
+        <Muted>لو ما في ترقيم صفحات، اترك الرابط بدون {'{page}'} وبيسحب صفحة وحدة. الحد الأقصى 50 صفحة بالطلب الواحد.</Muted>
+        <button onClick={runScrape} disabled={scraping || !urlPattern.trim()} style={{ ...primaryBtn, marginTop: 8, opacity: scraping || !urlPattern.trim() ? 0.6 : 1 }}>{scraping ? 'جارِ السحب…' : 'ابدأ السحب'}</button>
+        {errors.length > 0 && <p style={{ color: C.red, fontWeight: 700, fontSize: 12, marginTop: 8 }}>{errors.join(' | ')}</p>}
+      </Card>
+
+      {items.length > 0 && (
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <SectionTitle style={{ margin: 0 }}>{selectedCount} من {items.length} محدد</SectionTitle>
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ ...input, width: 'auto', marginBottom: 0 }}>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button onClick={runEnrich} disabled={enriching} style={{ ...ghostBtn, flex: 1 }}>
+              {enriching ? `جارِ استخراج الصور… (${enrichDone}/${items.filter(i => i.selected && i.url).length})` : 'استخرج الصور'}
+            </button>
+            <button onClick={runImport} disabled={importing || !categoryId || selectedCount === 0} style={{ ...primaryBtn, flex: 1 }}>
+              {importing ? `جارِ الإضافة… (${importDone}/${selectedCount})` : `أضف ${selectedCount} للفئة`}
+            </button>
+          </div>
+          {log && <div style={{ marginTop: 10, fontWeight: 800, color: C.violet }}>{log}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, maxHeight: 440, overflowY: 'auto' }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 8, borderRadius: 10, background: `${C.ink}06` }}>
+                <input type="checkbox" checked={it.selected} onChange={() => toggleSelect(i)} />
+                {it.posterUrl ? <img src={it.posterUrl} alt="" width={30} height={42} style={{ borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 30, height: 42, borderRadius: 4, background: `${C.ink}14`, flexShrink: 0 }} />}
+                <input value={it.name} onChange={e => setName(i, e.target.value)} style={{ ...input, marginBottom: 0, flex: 1 }} />
+                <span style={{ fontSize: 11, color: `${C.ink}66`, whiteSpace: 'nowrap' }}>{it.type}</span>
+                <button onClick={() => removeItem(i)} style={{ ...ghostBtn, padding: '4px 9px' }}>×</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

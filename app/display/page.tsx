@@ -5,10 +5,10 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { subscribeToWalaKelmaRoom, WalaKelmaRoom, TeamId, getBestActor } from '@/lib/wala-kelma'
 import { getCategories, type WKCategory } from '@/lib/works'
 import { CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@/lib/custom-works'
-import { WK_COLORS } from '@/lib/wala-kelma-content'
+import { WK_COLORS, typeLabelForCategory } from '@/lib/wala-kelma-content'
 import { serverNow } from '@/lib/firebase'
 import {
-  useWalaKelmaCountdown, useResultSounds, phaseTotal, PHASE_LABEL,
+  useWalaKelmaCountdown, useResultSounds, useTimerSounds, phaseTotal, PHASE_LABEL,
   TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs, Confetti,
 } from '@/components/shared'
 import { playDrumRollSound, playWinSound } from '@/lib/sound'
@@ -50,6 +50,7 @@ function DisplayInner() {
 
   const timeLeft = useWalaKelmaCountdown(room, false, muted)
   useResultSounds(room, muted)
+  useTimerSounds(room, muted)
   useWakeLock(!!room && room.status !== 'finished')
 
   // انقطاع المقدّم — لو آخر نبضة قلب تجاوزت 15 ثانية نعرض تنبيه بدل ما نتجمّد بصمت
@@ -175,6 +176,9 @@ function DisplayInner() {
   const silencedName = room.silencedPlayerId
     ? [...room.teams.A.players, ...room.teams.B.players].find(p => p.id === room.silencedPlayerId)?.name
     : null
+  const answerTypeLabel = room.currentWork
+    ? (room.currentWork.categoryId === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : typeLabelForCategory(cats.find(c => c.id === room.currentWork!.categoryId)?.name || ''))
+    : ''
 
   return (
     <div dir="rtl" style={{
@@ -240,7 +244,7 @@ function DisplayInner() {
             <div style={{ fontSize: 'clamp(18px, 2.4vw, 32px)', fontWeight: 800, color: `${C.ink}aa` }}>{PHASE_LABEL.searching}</div>
           </div>
         )}
-        {!stealing && room.phase !== 'resolved' && room.phase !== 'searching' && <>
+        {!stealing && room.phase !== 'resolved' && room.phase !== 'searching' && room.phase !== 'roundEnd' && <>
           <div style={{ fontSize: 'clamp(15px, 2vw, 26px)', color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
           <div style={{ fontSize: 'clamp(28px, 4.6vw, 68px)', fontWeight: 900, color: activeColor, textAlign: 'center' }}>{room.teams[room.activeTeam].name}</div>
           {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 'clamp(17px, 2.4vw, 32px)', fontWeight: 700, color: C.ink, textAlign: 'center' }}>يمثّل الآن: {slot.playerName}</div>}
@@ -275,6 +279,7 @@ function DisplayInner() {
                 {room.currentWork.posterUrl && <img src={room.currentWork.posterUrl} alt="" style={{ width: 'clamp(100px, 13vw, 190px)', height: 'clamp(140px, 18vw, 260px)', borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} />}
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 'clamp(11px, 1.2vw, 15px)', color: `${C.ink}77`, fontWeight: 700 }}>الإجابة الصحيحة</div>
+                  {answerTypeLabel && <div style={{ fontSize: 'clamp(16px, 2vw, 26px)', fontWeight: 900, color: C.violet, marginTop: 2 }}>{answerTypeLabel}</div>}
                   <div style={{ fontSize: 'clamp(30px, 5vw, 64px)', fontWeight: 900, color: C.ink, lineHeight: 1.35 }}>{room.currentWork.title}</div>
                   {(room.currentWork.year || room.currentWork.country) && (
                     <div style={{ fontSize: 'clamp(12px, 1.4vw, 16px)', color: `${C.ink}77`, fontWeight: 700, marginTop: 4 }}>
@@ -367,10 +372,10 @@ function DisplayDrawScreen({ room, cats }: { room: WalaKelmaRoom; cats: WKCatego
                 border: `2px solid ${tc}2a`, boxShadow: `0 10px 30px ${tc}14`,
                 animationDelay: `${i * 150}ms`, animationFillMode: 'backwards',
               }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 12 }}>{room.teams[id].name}</div>
+                <div style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 12 }}>{room.teams[id].name}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {room.teams[id].players.map(p => (
-                    <div key={p.id} style={{ fontSize: 15, fontWeight: 700, color: C.ink, textAlign: 'center', background: `${tc}0d`, borderRadius: 10, padding: '8px 10px' }}>{p.name}</div>
+                    <div key={p.id} style={{ fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: C.ink, textAlign: 'center', background: `${tc}0d`, borderRadius: 10, padding: '8px 10px' }}>{p.name}</div>
                   ))}
                 </div>
               </div>

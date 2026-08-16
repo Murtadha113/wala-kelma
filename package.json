@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "firebase": "^12.12.1",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.27.0",

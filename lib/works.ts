@@ -154,18 +154,21 @@ export async function pickRandomWork(
   const cats = categoryIds.slice(0, 10)
 
   try {
-    const snap = await getDocs(query(
-      collection(db, WORKS),
-      where('categoryId', 'in', cats),
-      where('isActive', '==', true),
-    ))
+    // نجيب أعمال الفئة وسجل "شافها قبل" بنفس الوقت (مو الواحد ورا الثاني) —
+    // يقلّل زمن الانتظار بشاشة "جاري البحث عن سؤال" لما الشبكة بطيئة
+    const [snap, seenMap] = await Promise.all([
+      getDocs(query(
+        collection(db, WORKS),
+        where('categoryId', 'in', cats),
+        where('isActive', '==', true),
+      )),
+      uid ? getSeenWorkIds(uid) : Promise.resolve(new Map<string, number>()),
+    ])
     const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as WalaKelmaWork))
 
     // مستوى 1: استبعاد أعمال هذي المباراة
     const notUsedThisMatch = all.filter(w => !usedInMatch.has(w.id))
     if (notUsedThisMatch.length === 0) return null
-
-    const seenMap = uid ? await getSeenWorkIds(uid) : new Map<string, number>()
 
     // مستوى 2: من بين الباقي، فضّل الأعمال اللي المستخدم ما شافها أبداً
     const neverSeen = notUsedThisMatch.filter(w => !seenMap.has(w.id))

@@ -364,7 +364,17 @@ async function drawWorkForCategories(
   const realCats = categories.filter(id => id !== CUSTOM_CATEGORY_ID)
   const includeCustom = categories.includes(CUSTOM_CATEGORY_ID)
 
-  const tryReal = async () => realCats.length > 0 ? pickRandomWork(realCats, usedInMatch, uid) : null
+  // نختار فئة وحدة عشوائياً أولاً (بتوزيع متساوٍ بين الفئات المختارة) بدل تجميع كل الأعمال مع بعض —
+  // لو ما سوّينا كذا، الفئة اللي فيها أعمال أكثر (مثلاً أفلام) تطغى إحصائياً على الفئات الباقية
+  const tryReal = async () => {
+    if (realCats.length === 0) return null
+    const order = [...realCats].sort(() => Math.random() - 0.5)
+    for (const cat of order) {
+      const r = await pickRandomWork([cat], usedInMatch, uid)
+      if (r) return r
+    }
+    return null
+  }
   const tryCustom = async () => includeCustom ? pickRandomCustomWork(uid, usedInMatch) : null
 
   const preferReal = realCats.length > 0 && (!includeCustom || Math.random() < 0.5)
@@ -605,9 +615,10 @@ async function endRoundOrMatch(code: string, room: WalaKelmaRoom, resetTurn: Rec
   const startingTeam: TeamId = room.roundStartingTeam === 'A' ? 'B' : 'A'
   const order = room.playerNamesEnabled === false ? buildTeamsOnlyOrder(startingTeam) : buildRoundOrder(room.teams, startingTeam)
   const questionsPerRound = room.playerNamesEnabled === false ? WK_TEAMS_ONLY_QUESTIONS : order.length
+  // ملاحظة: currentRound ما يترفع هنا عمداً — يترفع بـ continueAfterRound لما المقدّم يضغط "ابدأ الجولة التالية"،
+  // عشان شاشة "انتهت الجولة" تعرض رقم الجولة اللي خلصت لا الجاية
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     ...resetTurn,
-    currentRound: room.currentRound + 1,
     roundStartingTeam: startingTeam,
     turnOrder: order,
     currentTurnIndex: 0,
@@ -628,7 +639,16 @@ function buildTiebreakOrder(teams: Record<TeamId, WKTeam>, startingTeam: TeamId)
 }
 
 export async function continueAfterRound(code: string): Promise<void> {
-  await update(ref(rtdb, `${ROOMS}/${code}`), { phase: 'idle' })
+  const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
+  if (!snap.exists()) return
+  const room = snap.val() as WalaKelmaRoom
+  // الجوكر يتاح من جديد لكل فريق كل جولة (بعكس بقية الخصائص اللي مرة وحدة بالمباراة كاملة)
+  await update(ref(rtdb, `${ROOMS}/${code}`), {
+    phase: 'idle',
+    currentRound: room.currentRound + 1,
+    'powerUpsUsed/A/joker': false,
+    'powerUpsUsed/B/joker': false,
+  })
 }
 
 export async function finishMatch(code: string, winner: TeamId | 'draw'): Promise<void> {
@@ -704,6 +724,24 @@ export async function replayFromHistory(entry: MatchHistoryEntry, hostId: string
 
 function uidLocal(): string {
   return `p_${Math.random().toString(36).slice(2, 9)}`
+}
+
+// إعادة مباراة سريعة بنفس الفرق واللاعبين والفئات (بعد انتهاء مباراة الحين، لا من السجل) — تبدأ مباشرة بدون معالج الإعداد
+export async function rematchWithSameSetup(prev: WalaKelmaRoom, hostId: string, hostName: string): Promise<{ success: true; code: string } | { success: false; error: string }> {
+  const res = await createWalaKelmaRoom({ hostId, hostName })
+  if (!res.success) return res
+  const teams: Record<TeamId, WKTeam> = {
+    A: { name: prev.teams.A.name, score: 0, players: prev.teams.A.players.map(p => ({ id: uidLocal(), name: p.name })) },
+    B: { name: prev.teams.B.name, score: 0, players: prev.teams.B.players.map(p => ({ id: uidLocal(), name: p.name })) },
+  }
+  await updateMatchSetup(res.code, {
+    matchName: prev.matchName, teams, categories: prev.categories,
+    explainDuration: prev.explainDuration, totalRounds: prev.totalRounds,
+    mode: prev.mode, playerNamesEnabled: prev.playerNamesEnabled,
+  })
+  const start = await startMatch(res.code)
+  if (!start.success) { await deleteWalaKelmaRoom(res.code); return start }
+  return { success: true, code: res.code }
 }
 
 // يكتب إحصائيات كل لاعب على حساب المضيف — users/{hostUid}/players/{playerName}

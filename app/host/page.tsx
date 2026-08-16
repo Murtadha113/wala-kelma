@@ -10,11 +10,11 @@ import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
   onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, undoJoker, togglePause, resetPhaseTimer,
-  toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, setRoomRedirect, getBestActor,
+  toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, setRoomRedirect, getBestActor, rematchWithSameSetup,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
-import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN, typeLabelForCategory } from '@/lib/wala-kelma-content'
-import { useWalaKelmaCountdown, useResultSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti } from '@/components/shared'
+import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN, WK_JOKER_OUTCOMES, typeLabelForCategory } from '@/lib/wala-kelma-content'
+import { useWalaKelmaCountdown, useResultSounds, useTimerSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti } from '@/components/shared'
 import { playDrumRollSound } from '@/lib/sound'
 import { ShareResultButton } from '@/components/share-result'
 import { Logo } from '@/components/logo'
@@ -71,6 +71,7 @@ function HostPageInner() {
 
   const timeLeft = useWalaKelmaCountdown(room, true)
   useResultSounds(room)
+  useTimerSounds(room)
   useWakeLock(!!room && room.status !== 'finished')
 
   if (profile === 'loading') return <Loading />
@@ -87,6 +88,12 @@ function HostPageInner() {
         {room.status === 'finished' && <FinishedScreen room={room} onNew={async () => {
           const res = await createWalaKelmaRoom({ hostId: room.hostId, hostName: room.hostName })
           if (!res.success) { deleteWalaKelmaRoom(room.code); location.reload(); return }
+          await setRoomRedirect(room.code, res.code)
+          await deleteWalaKelmaRoom(room.code)
+          router.push(`/host?resume=${res.code}`)
+        }} onRematch={async () => {
+          const res = await rematchWithSameSetup(room, room.hostId, room.hostName)
+          if (!res.success) { alert(res.error); return }
           await setRoomRedirect(room.code, res.code)
           await deleteWalaKelmaRoom(room.code)
           router.push(`/host?resume=${res.code}`)
@@ -453,6 +460,8 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const [turnErr, setTurnErr] = useState('')
   const [endConfirm, setEndConfirm] = useState(false)
   const [scoreConfirm, setScoreConfirm] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null)
+  const [jokerSpinning, setJokerSpinning] = useState(false)
+  const [spinFace, setSpinFace] = useState(0)
   const [cats, setCats] = useState<WKCategory[]>([])
   const w = room.currentWork
 
@@ -466,6 +475,15 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
     setTurnErr('')
     const res = await startTurn(room.code, room.hostId)
     if (!res.success) setTurnErr(res.error)
+  }
+
+  const runJokerSpin = async () => {
+    setJokerSpinning(true)
+    let i = 0
+    const interval = setInterval(() => { i++; setSpinFace(i % WK_JOKER_OUTCOMES.length) }, 90)
+    await Promise.all([useJoker(room.code), new Promise(r => setTimeout(r, 1300))])
+    clearInterval(interval)
+    setJokerSpinning(false)
   }
 
   return (
@@ -495,19 +513,21 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         ))}
       </div>
 
-      <Card>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
-          <div style={{ fontSize: 24, fontWeight: 900, color }}>{room.teams[team].name}</div>
-          {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 16, fontWeight: 700 }}>يمثّل: {slot.playerName}</div>}
-          {room.playerNamesEnabled !== false && nextSlot && <div style={{ fontSize: 12, color: `${C.ink}66`, marginTop: 2 }}>التالي: {nextSlot.playerName}</div>}
-          {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && (
-            <div style={{ fontSize: 40, fontWeight: 900, color: timeLeft <= 10 ? C.red : color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-            </div>
-          )}
-        </div>
-      </Card>
+      {room.phase !== 'roundEnd' && (
+        <Card>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: `${C.ink}99` }}>{PHASE_LABEL[room.phase]}</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color }}>{room.teams[team].name}</div>
+            {room.playerNamesEnabled !== false && slot && <div style={{ fontSize: 16, fontWeight: 700 }}>يمثّل: {slot.playerName}</div>}
+            {room.playerNamesEnabled !== false && nextSlot && <div style={{ fontSize: 12, color: `${C.ink}66`, marginTop: 2 }}>التالي: {nextSlot.playerName}</div>}
+            {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'stealing') && (
+              <div style={{ fontSize: 40, fontWeight: 900, color: timeLeft <= 10 ? C.red : color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {room.phase === 'idle' && (
         <>
@@ -523,7 +543,11 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
                   return (
                     <div key={p.id} style={{ display: 'flex', gap: 6 }}>
                       <button disabled={used && !active} style={{ ...powerBtn(p.color, active, used), flex: 1 }}
-                        onClick={() => { if (used) return; if (p.id === 'silence') setSilencePick(true); else activatePowerUp(room.code, team, p.id as 'double' | 'deduct') }}>
+                        onClick={() => {
+                          if (used) return
+                          if (p.id === 'silence') { setSilencePick(true); return }
+                          setScoreConfirm({ title: `تفعيل "${p.name}"؟`, desc: p.desc, onConfirm: () => activatePowerUp(room.code, team, p.id as 'double' | 'deduct') })
+                        }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><p.icon size={15} /> {p.name}</span>
                         <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور' : used ? 'استُخدمت' : p.desc}</span>
                       </button>
@@ -539,14 +563,19 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
                 <div style={{ marginTop: 10 }}>
                   <Muted>اختر لاعباً من {room.teams[other].name} لإسكاته:</Muted>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                    {room.teams[other].players.map(pl => <button key={pl.id} onClick={() => { activatePowerUp(room.code, team, 'silence', pl.id); setSilencePick(false) }} style={pill(false)}>{pl.name}</button>)}
+                    {room.teams[other].players.map(pl => (
+                      <button key={pl.id} onClick={() => {
+                        setSilencePick(false)
+                        setScoreConfirm({ title: `إسكات ${pl.name}؟`, desc: `${pl.name} من ${room.teams[other].name} ما يقدر يخمّن هذا الدور.`, onConfirm: () => activatePowerUp(room.code, team, 'silence', pl.id) })
+                      }} style={pill(false)}>{pl.name}</button>
+                    ))}
                   </div>
                 </div>
               )}
             </Card>
           )}
           <button onClick={handleStartTurn} className="wk-breathe" style={{ ...primaryBtn, padding: '26px 15px', fontSize: 20, ['--wk-glow' as string]: 'rgba(88,46,244,0.45)' } as React.CSSProperties}>ابدأ</button>
-          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
+          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} setScoreConfirm={setScoreConfirm} />
         </>
       )}
 
@@ -573,7 +602,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <div style={{ display: 'flex', gap: 18, marginTop: 14 }}>
                 {w.posterUrl ? <img src={w.posterUrl} alt="" width={150} style={{ borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 150, height: 206, borderRadius: 16, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clapperboard size={40} color={`${C.ink}44`} /></div>}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  {typeLabel && <div style={{ fontSize: 13, fontWeight: 800, color: C.violet, marginBottom: 4 }}>{typeLabel}</div>}
+                  {typeLabel && <div style={{ fontSize: 16, fontWeight: 900, color: C.violet, marginBottom: 4 }}>{typeLabel}</div>}
                   <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.4 }}>{w.title}</div>
                   <div style={{ fontSize: 14, color: `${C.ink}99`, marginTop: 8 }}>{[w.year, w.country].filter(Boolean).join(' · ')}</div>
                 </div>
@@ -598,14 +627,20 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           )}
 
           <div style={{ display: 'flex', gap: 8 }}>
-            {!room.powerUpsUsed[team].joker && (
-              <button onClick={() => useJoker(room.code)} className="wk-breathe"
+            {!room.powerUpsUsed[team].joker && !jokerSpinning && (
+              <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'نتيجة عشوائية — إضافة نقطة، خصم نقطة، أو إعادة تمثيل بعمل جديد.', onConfirm: runJokerSpin })} className="wk-breathe"
                 style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>جوكر</button>
+            )}
+            {jokerSpinning && (
+              <div style={{ flex: 1, padding: '9px 12px', borderRadius: 12, border: `1.5px solid ${C.orange}`, background: `${C.orange}14`, color: C.orange, fontWeight: 800, fontSize: 13, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span style={{ display: 'inline-block', animation: 'wkspin 0.5s linear infinite' }}><Dices size={15} /></span>
+                {WK_JOKER_OUTCOMES[spinFace].emoji} {WK_JOKER_OUTCOMES[spinFace].label}
+              </div>
             )}
             <button onClick={() => togglePause(room.code)} title={room.paused ? 'استئناف' : 'إيقاف'} style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{room.paused ? <Play size={16} /> : <Pause size={16} />}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>إعادة الوقت</button>
           </div>
-          {room.joker && (
+          {room.joker && !jokerSpinning && (
             <div className="wk-pop-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Dices size={16} /> نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
@@ -616,7 +651,7 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>تراجع</button>
             </div>
           )}
-          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} />
+          <SkipCancelRow room={room} setEndConfirm={setEndConfirm} setScoreConfirm={setScoreConfirm} />
         </>
       )}
 
@@ -698,19 +733,25 @@ function ConfirmModal({ title, desc, onCancel, onConfirm }: { title: string; des
   )
 }
 
-function SkipCancelRow({ room, setEndConfirm }: { room: WalaKelmaRoom; setEndConfirm: (v: boolean) => void }) {
+function SkipCancelRow({ room, setEndConfirm, setScoreConfirm }: {
+  room: WalaKelmaRoom; setEndConfirm: (v: boolean) => void
+  setScoreConfirm: (v: { title: string; desc: string; onConfirm: () => void } | null) => void
+}) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
-      {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'idle') && <button onClick={() => skipTurn(room.code)} style={{ ...ghostBtn, flex: 1 }}>تخطّي العمل</button>}
+      {(room.phase === 'reading' || room.phase === 'acting' || room.phase === 'idle') && (
+        <button onClick={() => setScoreConfirm({ title: 'تخطّي العمل؟', desc: 'ينتقل الدور للاعب التالي بدون احتساب نقطة لأي فريق.', onConfirm: () => skipTurn(room.code) })} style={{ ...ghostBtn, flex: 1 }}>تخطّي العمل</button>
+      )}
       <button onClick={() => setEndConfirm(true)} style={{ ...ghostBtn, flex: 1, color: C.red, borderColor: `${C.red}55` }}>إنهاء</button>
     </div>
   )
 }
 
 // ═══════════════ FINISHED ═══════════════
-function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => void }) {
+function FinishedScreen({ room, onNew, onRematch }: { room: WalaKelmaRoom; onNew: () => void; onRematch: () => void }) {
   const win = room.winner
   const bestActor = getBestActor(room)
+  const [rematchBusy, setRematchBusy] = useState(false)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center', paddingTop: 30, textAlign: 'center' }}>
       <Confetti count={70} active={win !== 'draw'} />
@@ -731,15 +772,20 @@ function FinishedScreen({ room, onNew }: { room: WalaKelmaRoom; onNew: () => voi
         </div>
       )}
       <ShareResultButton room={room} refUid={room.hostId} />
-      <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 360 }}>
-        <button onClick={onNew} className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
-          style={{ flex: 1.4, padding: '13px 10px', borderRadius: 12, border: 'none', color: '#fff', fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap',
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 360 }}>
+        <button onClick={() => { setRematchBusy(true); onRematch() }} disabled={rematchBusy} className="transition-transform hover:scale-[1.02] active:scale-[0.99]"
+          style={{ padding: '13px 10px', borderRadius: 12, border: 'none', color: '#fff', fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', opacity: rematchBusy ? 0.7 : 1,
             background: `linear-gradient(135deg, ${C.red}, ${C.orange})`, cursor: 'pointer', boxShadow: `0 8px 18px ${C.red}2a` }}>
-          مباراة جديدة
+          {rematchBusy ? '…' : 'مباراة جديدة — نفس الفرق والفئات'}
         </button>
-        <a href="/" style={{ flex: 1, padding: '13px 10px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none' }}>
-          <ArrowLeft size={13} /> الرئيسية
-        </a>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onNew} style={{ flex: 1.4, padding: '13px 10px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+            إعداد جديد
+          </button>
+          <a href="/" style={{ flex: 1, padding: '13px 10px', borderRadius: 12, border: `1.5px solid ${C.ink}22`, background: 'transparent', color: `${C.ink}cc`, fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none' }}>
+            <ArrowLeft size={13} /> الرئيسية
+          </a>
+        </div>
       </div>
     </div>
   )

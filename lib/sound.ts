@@ -42,3 +42,7 @@ export function playTickSound(intensity: 0 | 1 | 2 | 3 = 0) {
 export function playDrumRollSound() {
   for (let i = 0; i < 14; i++) tone(90 + (i % 2) * 20, i * 0.09, 0.07, 'square', 0.1)
 }
+// إشارة بدء وقت التمثيل — نغمة صاعدة قصيرة
+export function playTimerStartSound() { tone(523, 0, 0.1, 'sine', 0.14); tone(784, 0.08, 0.16, 'sine', 0.14) }
+// إشارة انتهاء وقت التمثيل — نغمة هابطة
+export function playTimerEndSound() { tone(420, 0, 0.14, 'square', 0.13); tone(260, 0.11, 0.22, 'square', 0.13) }
