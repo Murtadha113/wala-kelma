@@ -669,6 +669,7 @@ function ScrapeTab() {
 
     if (fetchOk && fetchedRows.length === targets.length) {
       const PARSE_BATCH = 20
+      const batchErrors: string[] = []
       for (let i = 0; i < fetchedRows.length; i += PARSE_BATCH) {
         const chunk = fetchedRows.slice(i, i + PARSE_BATCH)
         try {
@@ -680,9 +681,14 @@ function ScrapeTab() {
           if (resp.ok) {
             const byUrl = new Map<string, string>((data.items || []).map((it: { url: string; image: string }) => [it.url, it.image]))
             setItems(prev => prev.map(it => (it.url && byUrl.has(it.url)) ? { ...it, posterUrl: byUrl.get(it.url) || '' } : it))
+          } else {
+            batchErrors.push(`دفعة ${chunk.length}: ${data.error || resp.status}`)
           }
-        } catch { /* تجاهل الدفعة الفاشلة واستمر بالباقي */ }
+        } catch (e) {
+          batchErrors.push(`دفعة ${chunk.length}: ${(e as Error).message}`)
+        }
       }
+      if (batchErrors.length) setErrors(batchErrors)
       setEnriching(false)
       return
     }
@@ -761,6 +767,7 @@ function ScrapeTab() {
             </button>
           </div>
           {log && <div style={{ marginTop: 10, fontWeight: 800, color: C.violet }}>{log}</div>}
+          {errors.length > 0 && <p style={{ color: C.red, fontWeight: 700, fontSize: 12, marginTop: 10 }}>{errors.join(' | ')}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, maxHeight: 440, overflowY: 'auto' }}>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 8, borderRadius: 10, background: `${C.ink}06` }}>
