@@ -653,29 +653,40 @@ function ScrapeTab() {
     setEnriching(true); setEnrichDone(0)
 
     // محاولة 1: نجيب صفحة كل عمل من متصفحك مباشرة (نفس فكرة runScrape) — يتجاوز حظر IP سيرفرنا
-    // لو الموقع يسمح كروس-أورجن
-    try {
-      const rows: { name: string; url: string; html: string }[] = []
-      for (const t of targets) {
-        if (!t.url) continue
+    // لو الموقع يسمح كروس-أورجن. نجمع كل الصفحات أول (بدون حد)، وبعدين نرسلها للتحليل
+    // بدفعات (حد أقصى 25 بالطلب الواحد لـ wk-parse-image — لو عدد الأعمال المحددة أكبر)
+    const fetchedRows: { name: string; url: string; html: string }[] = []
+    let fetchOk = true
+    for (const t of targets) {
+      if (!t.url) continue
+      try {
         const resp = await fetch(t.url)
         if (!resp.ok) throw new Error(String(resp.status))
-        rows.push({ name: t.name, url: t.url, html: await resp.text() })
-        setEnrichDone(d => d + 1)
+        fetchedRows.push({ name: t.name, url: t.url, html: await resp.text() })
+      } catch { fetchOk = false; break }
+      setEnrichDone(d => d + 1)
+    }
+
+    if (fetchOk && fetchedRows.length === targets.length) {
+      const PARSE_BATCH = 20
+      for (let i = 0; i < fetchedRows.length; i += PARSE_BATCH) {
+        const chunk = fetchedRows.slice(i, i + PARSE_BATCH)
+        try {
+          const resp = await fetch('/api/wk-parse-image', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: chunk }),
+          })
+          const data = await resp.json()
+          if (resp.ok) {
+            const byUrl = new Map<string, string>((data.items || []).map((it: { url: string; image: string }) => [it.url, it.image]))
+            setItems(prev => prev.map(it => (it.url && byUrl.has(it.url)) ? { ...it, posterUrl: byUrl.get(it.url) || '' } : it))
+          }
+        } catch { /* تجاهل الدفعة الفاشلة واستمر بالباقي */ }
       }
-      const resp = await fetch('/api/wk-parse-image', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows }),
-      })
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
-      const byUrl = new Map<string, string>((data.items || []).map((it: { url: string; image: string }) => [it.url, it.image]))
-      setItems(prev => prev.map(it => (it.url && byUrl.has(it.url)) ? { ...it, posterUrl: byUrl.get(it.url) || '' } : it))
       setEnriching(false)
       return
-    } catch {
-      // فشل الطلب المباشر (CORS مقفول أو خطأ شبكة بمنتصف الطريق) — نرجع للطريقة العادية عبر سيرفرنا
     }
+    // فشل الجلب المباشر (CORS مقفول أو خطأ شبكة بمنتصف الطريق) — نرجع للطريقة العادية عبر سيرفرنا
 
     setEnrichDone(0)
     const BATCH = 20
