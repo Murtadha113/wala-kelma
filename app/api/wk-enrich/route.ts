@@ -1,19 +1,18 @@
 // ═══════════════════════════════════════════════════════════════════════
 // استخراج صورة (بوستر) لكل عمل — الخطوة 2 من أداة "سحب أعمال" بالإدارة
 //
-// وقت سحب الأسماء (wk-scrape) ما نجيب الصورة — نجيبها هنا بخطوة منفصلة لأنها
-// تحتاج ندخل صفحة كل عمل لحاله (أبطأ)، فنسويها بس للأعمال اللي المشرف فعلاً
-// اختارها للإضافة، مو لكل شي طلع بالسحب.
+// هذا الراوت يجيب صفحة كل عمل بنفسه من سيرفرنا. لو الموقع يحظر IP سيرفرنا (Vercel)،
+// الواجهة تجرّب أول /api/wk-parse-image (طلب من متصفح المشرف نفسه) وترجع لهذا الراوت
+// بس لو ذاك فشل — نفس فكرة wk-scrape/wk-parse.
 //
 // طريقة الشغل لكل رابط عمل:
 // 1) ندخل صفحة العمل ونجيب الـ HTML.
-// 2) نقرأ وسم <meta property="og:image"> — تقريباً كل موقع حديث يحطه بصفحاته
-//    عشان صورة المعاينة لما تُشارك الصفحة (فيسبوك/واتساب)، فهو أدق مصدر للبوستر.
-// 3) لو ما فيه og:image، نجرّب twitter:image، وبعدها كحل أخير أول صورة بالمحتوى.
+// 2) نحلّلها بـ extractImage (lib/wk-scrape-shared): صورة alt مطابقة للاسم، ثم og:image،
+//    ثم أول صورة بالمحتوى — بالترتيب.
 // ═══════════════════════════════════════════════════════════════════════
-import * as cheerio from 'cheerio'
+import { extractImage } from '@/lib/wk-scrape-shared'
 
-// runtime: 'nodejs' لازم عشان cheerio يحتاج بيئة Node كاملة (مو بيئة Edge المحدودة)
+// runtime: 'nodejs' لازم عشان cheerio (تحليل الـHTML بالمكتبة المشتركة) يحتاج بيئة Node كاملة
 export const runtime = 'nodejs'
 
 interface EnrichRow { name: string; type?: string; url: string | null }
@@ -31,37 +30,7 @@ async function getImageForRow(row: EnrichRow): Promise<EnrichRow & { image: stri
     })
     if (!resp.ok) return { ...row, image: '' }
     const html = await resp.text()
-    const $ = cheerio.load(html)
-
-    let image = ''
-
-    // أولوية 1: صورة نص alt عندها يطابق اسم العمل — أدق مصدر لو موجود، وما يهم شكل القالب.
-    // بعض المواقع (زي عرب سينما) تحط نفس og:image الافتراضي بكل صفحات الموقع فيصير عديم الفايدة،
-    // فمطابقة alt بالاسم أوثق منه
-    const normalizedName = row.name.trim().toLowerCase()
-    if (normalizedName) {
-      $('img[alt]').each((_, el) => {
-        if (image) return
-        const alt = ($(el).attr('alt') || '').trim().toLowerCase()
-        if (alt && (alt === normalizedName || alt.includes(normalizedName) || normalizedName.includes(alt))) {
-          const src = $(el).attr('src')
-          if (src) image = src
-        }
-      })
-    }
-
-    // أولوية 2: وسم meta القياسي (og:image / twitter:image)
-    if (!image) image = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || ''
-
-    // أولوية 3 (أخيرة): أول صورة داخل منطقة المحتوى الرئيسية بالصفحة
-    if (!image) {
-      const firstImg = $('article img, .postDiv img, .single img, main img').first().attr('src')
-      if (firstImg) image = firstImg
-    }
-
-    if (image) image = new URL(image, row.url).toString()   // نحوّلها لرابط كامل لو كانت نسبية
-
-    return { ...row, image: image || '' }
+    return { ...row, image: extractImage(html, row.url, row.name) }
   } catch {
     return { ...row, image: '' }
   }

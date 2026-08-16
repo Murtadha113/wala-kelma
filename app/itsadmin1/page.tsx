@@ -587,8 +587,47 @@ function ScrapeTab() {
 
   const selectedCount = items.filter(it => it.selected).length
 
+  // يبني روابط الصفحات المطلوبة — نفس منطق التعويض والحد الأقصى اللي بسيرفر wk-scrape
+  const buildPageUrls = (): string[] => {
+    const hasPlaceholder = urlPattern.includes('{page}')
+    const start = startPage || 1
+    const end = hasPlaceholder ? Math.min(startPage + 49, endPage || start) : start
+    const urls: string[] = []
+    for (let p = start; p <= end; p++) {
+      urls.push(hasPlaceholder ? urlPattern.replace('{page}', String(p)) : urlPattern)
+      if (!hasPlaceholder) break
+    }
+    return urls
+  }
+
   const runScrape = async () => {
     setScraping(true); setErrors([]); setItems([]); setLog('')
+
+    // محاولة 1: نجيب الصفحات من متصفحك مباشرة (يشتغل بس لو الموقع الهدف يسمح كروس-أورجن) —
+    // بعض المواقع تحظر IP سيرفرنا (Vercel) بينما تسمح بطلب من متصفح حقيقي عادي زي متصفحك
+    try {
+      const pages: { html: string; pageUrl: string; page: number }[] = []
+      const pageUrls = buildPageUrls()
+      for (let i = 0; i < pageUrls.length; i++) {
+        const resp = await fetch(pageUrls[i])
+        if (!resp.ok) throw new Error(String(resp.status))
+        pages.push({ html: await resp.text(), pageUrl: pageUrls[i], page: i + 1 })
+      }
+      const resp = await fetch('/api/wk-parse', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
+      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: true })))
+      setErrors(data.errors || [])
+      setScraping(false)
+      return
+    } catch {
+      // الموقع ما يسمح بطلب مباشر من المتصفح (CORS مقفول) أو صار خطأ شبكة — نرجع للطريقة
+      // العادية عبر سيرفرنا (تشتغل مع أغلب المواقع، إلا لو الموقع يحظر IP الاستضافة السحابية تحديداً)
+    }
+
     try {
       const resp = await fetch('/api/wk-scrape', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -612,6 +651,33 @@ function ScrapeTab() {
     const targets = items.filter(it => it.selected && it.url && !it.posterUrl)
     if (targets.length === 0) return
     setEnriching(true); setEnrichDone(0)
+
+    // محاولة 1: نجيب صفحة كل عمل من متصفحك مباشرة (نفس فكرة runScrape) — يتجاوز حظر IP سيرفرنا
+    // لو الموقع يسمح كروس-أورجن
+    try {
+      const rows: { name: string; url: string; html: string }[] = []
+      for (const t of targets) {
+        if (!t.url) continue
+        const resp = await fetch(t.url)
+        if (!resp.ok) throw new Error(String(resp.status))
+        rows.push({ name: t.name, url: t.url, html: await resp.text() })
+        setEnrichDone(d => d + 1)
+      }
+      const resp = await fetch('/api/wk-parse-image', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
+      const byUrl = new Map<string, string>((data.items || []).map((it: { url: string; image: string }) => [it.url, it.image]))
+      setItems(prev => prev.map(it => (it.url && byUrl.has(it.url)) ? { ...it, posterUrl: byUrl.get(it.url) || '' } : it))
+      setEnriching(false)
+      return
+    } catch {
+      // فشل الطلب المباشر (CORS مقفول أو خطأ شبكة بمنتصف الطريق) — نرجع للطريقة العادية عبر سيرفرنا
+    }
+
+    setEnrichDone(0)
     const BATCH = 20
     for (let i = 0; i < targets.length; i += BATCH) {
       const chunk = targets.slice(i, i + BATCH)
