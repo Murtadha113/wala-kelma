@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { uploadImage } from '@/lib/storage'
 import {
   getCategories, addCategory, updateCategory, deleteCategory, seedDefaultCategories,
-  getAllWorks, addWork, updateWork, deleteWork,
+  getAllWorks, addWork, updateWork, deleteWork, normalizeTitle, findDuplicateWorks,
   WKCategory, WalaKelmaWork, NewWork, Difficulty,
 } from '@/lib/works'
 import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/components/admin-ui'
@@ -280,6 +280,8 @@ function WorksTab() {
   const [cats, setCats] = useState<WKCategory[]>([])
   const [works, setWorks] = useState<WalaKelmaWork[]>([])
   const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [showDupes, setShowDupes] = useState(false)
   const [editing, setEditing] = useState<WalaKelmaWork | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -293,7 +295,10 @@ function WorksTab() {
   useEffect(() => { reload() }, [])
 
   const catName = (id: string) => cats.find(c => c.id === id)?.name || '—'
-  const filtered = filter ? works.filter(w => w.categoryId === filter) : works
+  const filtered = works
+    .filter(w => !filter || w.categoryId === filter)
+    .filter(w => !search.trim() || w.title.toLowerCase().includes(search.trim().toLowerCase()))
+  const dupeGroups = findDuplicateWorks(works)
 
   const titleFromFilename = (name: string) => name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim()
 
@@ -337,13 +342,46 @@ function WorksTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ ...input, flex: 1 }}>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ ...input, flex: 1, marginBottom: 0 }}>
           <option value="">كل الفئات ({works.length})</option>
           {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
         </select>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث بالاسم…" style={{ ...input, flex: 1, marginBottom: 0 }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button onClick={() => setShowDupes(v => !v)} style={{ ...ghostBtn, flex: 1, ...(dupeGroups.length > 0 ? { color: C.orange, borderColor: `${C.orange}55` } : {}) }}>
+          الأعمال المكررة {dupeGroups.length > 0 ? `(${dupeGroups.length})` : ''}
+        </button>
         <button onClick={openQuickAdd} style={{ ...ghostBtn, width: 'auto', padding: '11px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}><ClipboardList size={14} /> إضافة سريعة</button>
         <button onClick={() => { setEditing(null); setShowForm(true) }} style={{ ...primaryBtn, width: 'auto', padding: '11px 18px', whiteSpace: 'nowrap' }}>+ عمل</button>
       </div>
+
+      {showDupes && (
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <SectionTitle style={{ margin: 0 }}>الأعمال المكررة (نفس الاسم)</SectionTitle>
+            <button onClick={() => setShowDupes(false)} style={ghostBtn}>إغلاق</button>
+          </div>
+          {dupeGroups.length === 0 && <Muted>ما فيه أعمال مكررة حالياً.</Muted>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {dupeGroups.map((group, gi) => (
+              <div key={gi} style={{ border: `1px solid ${C.orange}33`, borderRadius: 12, padding: 8 }}>
+                {group.map(w => (
+                  <div key={w.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 6 }}>
+                    {w.posterUrl ? <img src={w.posterUrl} alt="" width={30} height={42} style={{ borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 30, height: 42, borderRadius: 4, background: `${C.ink}14`, flexShrink: 0 }} />}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13 }}>{w.title}</div>
+                      <div style={{ fontSize: 11, color: `${C.ink}77` }}>{catName(w.categoryId)}{!w.isActive ? ' · موقوف' : ''}</div>
+                    </div>
+                    <button onClick={() => setEditing(w)} style={ghostBtn}>تعديل</button>
+                    <button onClick={async () => { if (confirm('حذف العمل؟')) { await deleteWork(w.id); reload() } }} style={{ ...ghostBtn, color: C.red }}>حذف</button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {showQuickAdd && (
         <Card>
@@ -425,8 +463,13 @@ function WorkForm({ cats, works, initial, onClose, onSaved }: { cats: WKCategory
     setUploading(false)
   }
 
+  // تنبيه تكرار حي — يقارن العنوان (بعد التطبيع) مع باقي الأعمال المحمّلة، ويتجاهل العمل
+  // نفسه لو نعدّل عمل موجود
+  const dup = f.title.trim() ? works.find(w => w.id !== initial?.id && normalizeTitle(w.title) === normalizeTitle(f.title)) : null
+
   const save = async () => {
     if (!f.title.trim() || !f.categoryId) { alert('العنوان والفئة مطلوبان'); return }
+    if (dup && !confirm(`فيه عمل بنفس الاسم موجود مسبقاً: "${dup.title}" (${cats.find(c => c.id === dup.categoryId)?.name || '—'}). تبي تكمل الحفظ؟`)) return
     setBusy(true)
     const data: NewWork = { ...f, actors: actorsStr.split(/[،,]/).map(s => s.trim()).filter(Boolean) }
     if (initial) await updateWork(initial.id, data)
@@ -444,6 +487,11 @@ function WorkForm({ cats, works, initial, onClose, onSaved }: { cats: WKCategory
           </div>
           <input value={f.title} onChange={e => set('title', e.target.value)}
             placeholder={cats.find(c => c.id === f.categoryId)?.name.includes('أجنبية') ? 'اسم العمل (إنجليزي) *' : 'اسم العمل *'} style={input} />
+          {dup && (
+            <p style={{ fontSize: 12, fontWeight: 700, color: C.orange, background: `${C.orange}14`, borderRadius: 8, padding: '6px 10px', marginTop: -4, marginBottom: 10 }}>
+              ⚠️ فيه عمل بنفس الاسم موجود: "{dup.title}" ({cats.find(c => c.id === dup.categoryId)?.name || '—'})
+            </p>
+          )}
           <select value={f.categoryId} onChange={e => set('categoryId', e.target.value)} style={input}>
             <option value="">اختر الفئة *</option>
             {cats.map(c => <option key={c.id} value={c.id}>{c.name} ({works.filter(w => w.categoryId === c.id).length})</option>)}
@@ -571,6 +619,7 @@ interface ScrapedItem { name: string; type: string; url: string | null; page?: n
 function ScrapeTab() {
   const [cats, setCats] = useState<WKCategory[]>([])
   const [categoryId, setCategoryId] = useState('')
+  const [existingTitles, setExistingTitles] = useState<Set<string>>(new Set())
   const [urlPattern, setUrlPattern] = useState('')
   const [startPage, setStartPage] = useState(1)
   const [endPage, setEndPage] = useState(1)
@@ -583,9 +632,15 @@ function ScrapeTab() {
   const [importDone, setImportDone] = useState(0)
   const [log, setLog] = useState('')
 
-  useEffect(() => { getCategories().then(cs => { setCats(cs); setCategoryId(cs[0]?.id || '') }) }, [])
+  useEffect(() => {
+    getCategories().then(cs => { setCats(cs); setCategoryId(cs[0]?.id || '') })
+    // نجيب عناوين الأعمال الموجودة مسبقاً عشان نحذّر لو المسحوب يتكرر معها (نفس فكرة تنبيه WorkForm)
+    getAllWorks().then(ws => setExistingTitles(new Set(ws.map(w => normalizeTitle(w.title)))))
+  }, [])
 
+  const isDuplicate = (name: string) => existingTitles.has(normalizeTitle(name))
   const selectedCount = items.filter(it => it.selected).length
+  const duplicateCount = items.filter(it => isDuplicate(it.name)).length
 
   // يبني روابط الصفحات المطلوبة — نفس منطق التعويض والحد الأقصى اللي بسيرفر wk-scrape
   const buildPageUrls = (): string[] => {
@@ -619,7 +674,7 @@ function ScrapeTab() {
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
-      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: true })))
+      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: !isDuplicate(it.name) })))
       setErrors(data.errors || [])
       setScraping(false)
       return
@@ -635,7 +690,7 @@ function ScrapeTab() {
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error || 'خطأ غير معروف')
-      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: true })))
+      setItems((data.items || []).map((it: Omit<ScrapedItem, 'selected'>) => ({ ...it, selected: !isDuplicate(it.name) })))
       setErrors(data.errors || [])
     } catch (e) {
       setErrors([(e as Error).message])
@@ -753,7 +808,7 @@ function ScrapeTab() {
       {items.length > 0 && (
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <SectionTitle style={{ margin: 0 }}>{selectedCount} من {items.length} محدد</SectionTitle>
+            <SectionTitle style={{ margin: 0 }}>{selectedCount} من {items.length} محدد{duplicateCount > 0 ? ` — ⚠️ ${duplicateCount} مكرر (موجود مسبقاً، غير محدد تلقائياً)` : ''}</SectionTitle>
             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ ...input, width: 'auto', marginBottom: 0 }}>
               {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -774,6 +829,7 @@ function ScrapeTab() {
                 <input type="checkbox" checked={it.selected} onChange={() => toggleSelect(i)} />
                 {it.posterUrl ? <img src={it.posterUrl} alt="" width={30} height={42} style={{ borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 30, height: 42, borderRadius: 4, background: `${C.ink}14`, flexShrink: 0 }} />}
                 <input value={it.name} onChange={e => setName(i, e.target.value)} style={{ ...input, marginBottom: 0, flex: 1 }} />
+                {isDuplicate(it.name) && <span title="موجود مسبقاً بالقاعدة" style={{ fontSize: 10, fontWeight: 800, color: C.red, background: `${C.red}14`, borderRadius: 6, padding: '3px 6px', whiteSpace: 'nowrap' }}>مكرر</span>}
                 <span style={{ fontSize: 11, color: `${C.ink}66`, whiteSpace: 'nowrap' }}>{it.type}</span>
                 <button onClick={() => removeItem(i)} style={{ ...ghostBtn, padding: '4px 9px' }}>×</button>
               </div>

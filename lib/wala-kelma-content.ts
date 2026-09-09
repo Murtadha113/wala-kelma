@@ -41,7 +41,7 @@ export interface PowerUpDef {
 export const WK_POWERUPS: PowerUpDef[] = [
   { id: 'double',  name: 'مضاعفة النقطة', icon: Copy, desc: 'إذا خمّن فريقك صح تحصل نقطتين بدل نقطة', color: '#27AE78', preTurn: true },
   { id: 'deduct',  name: 'خصم نقطة',      icon: Minus, desc: 'إذا خمّن فريقك صح تُخصم نقطة من الخصم', color: WK_COLORS.red, preTurn: true },
-  { id: 'silence', name: 'إسكات لاعب',    icon: MicOff, desc: 'تختار لاعب من الخصم يُمنع من التخمين هذا الدور', color: WK_COLORS.violet, preTurn: true },
+  { id: 'silence', name: 'إسكات لاعب',    icon: MicOff, desc: 'الفريق المقابل يسكت لاعباً من فريقك يُمنع من التخمين وقت دوركم', color: WK_COLORS.violet, preTurn: true },
   { id: 'joker',   name: 'الجوكر',        icon: Dices, desc: 'يُفعّل أي وقت خلال دور فريقك — نتيجة عشوائية', color: WK_COLORS.orange, preTurn: false },
 ]
 

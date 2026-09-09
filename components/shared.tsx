@@ -209,6 +209,7 @@ export function useResultSounds(room: WalaKelmaRoom | null, muted = false) {
         if (room.lastResult.type === 'correct') playCorrectSound()
         else if (room.lastResult.type === 'steal') playStealSound()
         else if (room.lastResult.type === 'timeout') playWrongSound()
+        else if (room.lastResult.type === 'joker') (room.lastResult.points > 0 ? playCorrectSound() : playWrongSound())
       }
     }
     if (room.status === 'finished' && !finRef.current) { finRef.current = true; if (!muted) playWinSound() }

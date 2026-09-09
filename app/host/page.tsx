@@ -535,10 +535,13 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
             <Card><Muted><span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Zap size={13} /> الوضع السريع: بدون خصائص ما قبل الدور — الجوكر متاح فقط أثناء التمثيل.</span></Muted></Card>
           ) : (
             <Card>
-              <SectionTitle>خصائص {room.teams[team].name} (قبل الدور)</SectionTitle>
+              <SectionTitle>خصائص قبل الدور</SectionTitle>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {WK_POWERUPS.filter(p => p.preTurn).map(p => {
-                  const used = room.powerUpsUsed[team][p.id]
+                  // المضاعفة/الخصم خصائص الفريق النشط لصالحه، لكن الإسكات عكسها: خاصية الفريق
+                  // المقابل يستخدمها ضد الفريق النشط — عشان كذا نتحقق من صاحب الخاصية الصح لكل نوع
+                  const owner = p.id === 'silence' ? other : team
+                  const used = room.powerUpsUsed[owner][p.id]
                   const active = room.activePowerUps[p.id as 'double' | 'deduct' | 'silence']
                   return (
                     <div key={p.id} style={{ display: 'flex', gap: 6 }}>
@@ -548,11 +551,11 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
                           if (p.id === 'silence') { setSilencePick(true); return }
                           setScoreConfirm({ title: `تفعيل "${p.name}"؟`, desc: p.desc, onConfirm: () => activatePowerUp(room.code, team, p.id as 'double' | 'deduct') })
                         }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><p.icon size={15} /> {p.name}</span>
-                        <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور' : used ? 'استُخدمت' : p.desc}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><p.icon size={15} /> {p.name}{p.id === 'silence' ? ` (${room.teams[other].name})` : ''}</span>
+                        <span style={{ fontSize: 11, opacity: 0.8 }}>{active ? 'مفعّلة لهذا الدور' : used ? 'استُخدمت' : p.id === 'silence' ? `${room.teams[other].name} يسكت لاعباً من ${room.teams[team].name}` : p.desc}</span>
                       </button>
                       {active && (
-                        <button onClick={() => { deactivatePowerUp(room.code, team, p.id as 'double' | 'deduct' | 'silence'); setSilencePick(false) }}
+                        <button onClick={() => { deactivatePowerUp(room.code, owner, p.id as 'double' | 'deduct' | 'silence'); setSilencePick(false) }}
                           style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>تراجع</button>
                       )}
                     </div>
@@ -561,12 +564,12 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               </div>
               {silencePick && (
                 <div style={{ marginTop: 10 }}>
-                  <Muted>اختر لاعباً من {room.teams[other].name} لإسكاته:</Muted>
+                  <Muted>اختر لاعباً من {room.teams[team].name} يسكته {room.teams[other].name}:</Muted>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                    {room.teams[other].players.map(pl => (
+                    {room.teams[team].players.map(pl => (
                       <button key={pl.id} onClick={() => {
                         setSilencePick(false)
-                        setScoreConfirm({ title: `إسكات ${pl.name}؟`, desc: `${pl.name} من ${room.teams[other].name} ما يقدر يخمّن هذا الدور.`, onConfirm: () => activatePowerUp(room.code, team, 'silence', pl.id) })
+                        setScoreConfirm({ title: `إسكات ${pl.name}؟`, desc: `${pl.name} من ${room.teams[team].name} ما يقدر يخمّن هذا الدور.`, onConfirm: () => activatePowerUp(room.code, other, 'silence', pl.id) })
                       }} style={pill(false)}>{pl.name}</button>
                     ))}
                   </div>
@@ -631,12 +634,6 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'نتيجة عشوائية — إضافة نقطة، خصم نقطة، أو إعادة تمثيل بعمل جديد.', onConfirm: runJokerSpin })} className="wk-breathe"
                 style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>جوكر</button>
             )}
-            {jokerSpinning && (
-              <div style={{ flex: 1, padding: '9px 12px', borderRadius: 12, border: `1.5px solid ${C.orange}`, background: `${C.orange}14`, color: C.orange, fontWeight: 800, fontSize: 13, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', animation: 'wkspin 0.5s linear infinite' }}><Dices size={15} /></span>
-                {WK_JOKER_OUTCOMES[spinFace].emoji} {WK_JOKER_OUTCOMES[spinFace].label}
-              </div>
-            )}
             <button onClick={() => togglePause(room.code)} title={room.paused ? 'استئناف' : 'إيقاف'} style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{room.paused ? <Play size={16} /> : <Pause size={16} />}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>إعادة الوقت</button>
           </div>
@@ -655,7 +652,16 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         </>
       )}
 
-      {room.phase === 'resolved' && (
+      {jokerSpinning && (
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '6px 0', fontWeight: 800, fontSize: 15, color: C.orange }}>
+            <span style={{ display: 'inline-block', animation: 'wkspin 0.5s linear infinite' }}><Dices size={18} /></span>
+            {WK_JOKER_OUTCOMES[spinFace].emoji} {WK_JOKER_OUTCOMES[spinFace].label}
+          </div>
+        </Card>
+      )}
+
+      {room.phase === 'resolved' && !jokerSpinning && (
         <>
           <Confetti key={room.lastResult?.ts} count={12} active={!!room.lastResult && room.lastResult.points > 0} />
           <Card>
@@ -663,6 +669,9 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               {room.lastResult?.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'steal' && `🥷 سرقة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
+              {room.lastResult?.type === 'joker' && (room.lastResult.points > 0
+                ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
+                : `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`)}
             </div>
           </Card>
           <button onClick={() => nextTurn(room.code)} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>الدور التالي <ArrowLeft size={17} /></button>

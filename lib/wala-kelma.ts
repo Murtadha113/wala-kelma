@@ -4,14 +4,14 @@ import { ref, set, get, onValue, off, update, remove } from 'firebase/database'
 import { doc, writeBatch, increment, addDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore'
 import { rtdb, db, serverNow } from './firebase'
 import { generateCode } from './code'
-import { pickRandomWork, WalaKelmaWork } from './works'
+import { pickRandomWork, getCategories, WalaKelmaWork } from './works'
 import { pickRandomCustomWork, CUSTOM_CATEGORY_ID, type CustomWork } from './custom-works'
 import { getUserProfile, updateUserProfile } from './auth'
 import { recordGroupResult } from './friend-groups'
 import {
   WK_READ_SECONDS, WK_QUICK_READ_SECONDS, WK_STEAL_SECONDS, WK_QUICK_EXPLAIN, WK_TEAMS_ONLY_QUESTIONS,
   type ExplainDuration, type PreTurnPowerUp,
-  type JokerOutcome, drawJokerOutcome,
+  type JokerOutcome, drawJokerOutcome, typeLabelForCategory,
 } from './wala-kelma-content'
 
 const ROOMS = 'wala_kelma_rooms'
@@ -68,6 +68,8 @@ export interface WalaKelmaRoom {
   categoryExhausted?: boolean   // نفدت الأعمال الجديدة بالفئات المختارة (نعرض للمقدم تنبيه)
 
   usedWorkIds: string[]
+  lastPickedType: string | null   // "نوع" آخر عمل انسحب (فيلم/مسلسل/...) — لمنع تكرار نفس النوع 3 مرات ورا بعض
+  pickedTypeStreak: number        // كم مرة متتالية انسحب فيها نفس النوع
   activeTeam: TeamId
   activePowerUps: WKActivePowerUps
   silencedPlayerId: string | null
@@ -124,6 +126,8 @@ function baseRoom(hostId: string, hostName: string, code: string): Omit<WalaKelm
     pausedRemainingMs: null,
     questionHidden: false,
     usedWorkIds: [],
+    lastPickedType: null,
+    pickedTypeStreak: 0,
     activeTeam: 'A',
     activePowerUps: { ...EMPTY_POWERUPS },
     silencedPlayerId: null,
@@ -172,6 +176,8 @@ function normalizeRoom(raw: any, code: string): WalaKelmaRoom {
     categories: Array.isArray(r.categories) ? r.categories : [],
     turnOrder: Array.isArray(r.turnOrder) ? r.turnOrder : [],
     usedWorkIds: Array.isArray(r.usedWorkIds) ? r.usedWorkIds : [],
+    lastPickedType: r.lastPickedType ?? null,
+    pickedTypeStreak: r.pickedTypeStreak ?? 0,
     activePowerUps: { ...EMPTY_POWERUPS, ...(r.activePowerUps || {}) },
     powerUpsUsed: {
       A: { ...EMPTY_USED, ...(r.powerUpsUsed?.A || {}) },
@@ -310,11 +316,18 @@ export async function beginPlaying(code: string): Promise<void> {
 }
 
 // ── الخصائص قبل الدور ──
+// المضاعفة والخصم خصائص الفريق النشط نفسه لصالحه، لكن الإسكات عكسها: هي خاصية *الفريق المقابل*
+// (اللي بينتظر يخمّن) يستخدمها ضد الفريق النشط — يسكت لاعب من فريق الممثّل نفسه، مو من فريقه هو
+function expectedActivator(room: WalaKelmaRoom, powerUp: PreTurnPowerUp): TeamId {
+  if (powerUp !== 'silence') return room.activeTeam
+  return room.activeTeam === 'A' ? 'B' : 'A'
+}
+
 export async function activatePowerUp(code: string, teamId: TeamId, powerUp: PreTurnPowerUp, silencedPlayerId?: string): Promise<void> {
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return
   const room = snap.val() as WalaKelmaRoom
-  if (room.phase !== 'idle' || room.activeTeam !== teamId) return
+  if (room.phase !== 'idle' || expectedActivator(room, powerUp) !== teamId) return
   if (room.powerUpsUsed?.[teamId]?.[powerUp]) return
   if (room.mode === 'quick') return   // الوضع السريع: الجوكر فقط، بدون خصائص ما قبل الدور
   await update(ref(rtdb, `${ROOMS}/${code}`), {
@@ -329,7 +342,7 @@ export async function deactivatePowerUp(code: string, teamId: TeamId, powerUp: P
   const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
   if (!snap.exists()) return
   const room = snap.val() as WalaKelmaRoom
-  if (room.phase !== 'idle' || room.activeTeam !== teamId) return
+  if (room.phase !== 'idle' || expectedActivator(room, powerUp) !== teamId) return
   if (!room.activePowerUps?.[powerUp]) return
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     [`activePowerUps/${powerUp}`]: false,
@@ -360,35 +373,60 @@ function customWorkToCurrent(w: CustomWork): WKCurrentWork {
 // مع fallback للمصدر الثاني لو الأول نفد
 async function drawWorkForCategories(
   categories: string[], usedInMatch: Set<string>, uid: string,
-): Promise<{ current: WKCurrentWork; exhausted: boolean } | null> {
+  lastPickedType: string | null, pickedTypeStreak: number,
+): Promise<{ current: WKCurrentWork; exhausted: boolean; type: string } | null> {
   const realCats = categories.filter(id => id !== CUSTOM_CATEGORY_ID)
   const includeCustom = categories.includes(CUSTOM_CATEGORY_ID)
 
-  // نختار فئة وحدة عشوائياً أولاً (بتوزيع متساوٍ بين الفئات المختارة) بدل تجميع كل الأعمال مع بعض —
-  // لو ما سوّينا كذا، الفئة اللي فيها أعمال أكثر (مثلاً أفلام) تطغى إحصائياً على الفئات الباقية
+  // نختار "نوع" (فيلم/مسلسل/مسرحية/مثل شعبي) عشوائياً أولاً، وبعدين فئة عشوائية داخل هذا النوع —
+  // بدل تجميع كل الأعمال مع بعض أو حتى التوزيع المتساوي بين الفئات مباشرة. لو ما سوّينا كذا،
+  // فئة وحدة أكثر أعمال (مثلاً أفلام) تطغى، أو حتى لو الفئات متوازنة، اختيار المضيف لعدة فئات
+  // من نفس النوع (مثلاً "مسلسلات عربية" + "مسلسلات خليجية") يخلي هذا النوع يطلع أغلب الوقت —
+  // "5 مسلسلات ورا بعض" رغم إن كل فئة متساوية باحتمال الاختيار.
+  // وفوق هذا، لو نفس النوع طلع مرتين ورا بعض، نستبعده من الاختيار (لو فيه نوع ثاني متاح) عشان
+  // ما يتكرر ثالث مرة — التوزيع العشوائي البحت ما يمنع صدفة 3 متتالية، وهذا قيد صريح يمنعها
   const tryReal = async () => {
     if (realCats.length === 0) return null
-    const order = [...realCats].sort(() => Math.random() - 0.5)
-    for (const cat of order) {
-      const r = await pickRandomWork([cat], usedInMatch, uid)
-      if (r) return r
+    const allCats = await getCategories()
+    const nameById = new Map(allCats.map(c => [c.id, c.name]))
+    const typeOf = (id: string) => typeLabelForCategory(nameById.get(id) || '')
+    const groups = new Map<string, string[]>()
+    for (const id of realCats) {
+      const t = typeOf(id)
+      groups.set(t, [...(groups.get(t) || []), id])
+    }
+    let candidateTypes = [...groups.keys()]
+    if (lastPickedType && pickedTypeStreak >= 2 && candidateTypes.some(t => t !== lastPickedType)) {
+      candidateTypes = candidateTypes.filter(t => t !== lastPickedType)
+    }
+    const typeOrder = candidateTypes.sort(() => Math.random() - 0.5)
+    for (const t of typeOrder) {
+      const catsInType = [...(groups.get(t) || [])].sort(() => Math.random() - 0.5)
+      for (const cat of catsInType) {
+        const r = await pickRandomWork([cat], usedInMatch, uid)
+        if (r) return { ...r, type: t }
+      }
     }
     return null
   }
-  const tryCustom = async () => includeCustom ? pickRandomCustomWork(uid, usedInMatch) : null
+  const tryCustom = async () => {
+    if (!includeCustom) return null
+    const c = await pickRandomCustomWork(uid, usedInMatch)
+    return c ? { work: c, type: CUSTOM_CATEGORY_ID } : null
+  }
 
   const preferReal = realCats.length > 0 && (!includeCustom || Math.random() < 0.5)
   if (preferReal) {
     const r = await tryReal()
-    if (r) return { current: workToCurrent(r.work), exhausted: r.exhausted }
+    if (r) return { current: workToCurrent(r.work), exhausted: r.exhausted, type: r.type }
     const c = await tryCustom()
-    if (c) return { current: customWorkToCurrent(c), exhausted: false }
+    if (c) return { current: customWorkToCurrent(c.work), exhausted: false, type: c.type }
     return null
   }
   const c = await tryCustom()
-  if (c) return { current: customWorkToCurrent(c), exhausted: false }
+  if (c) return { current: customWorkToCurrent(c.work), exhausted: false, type: c.type }
   const r = await tryReal()
-  if (r) return { current: workToCurrent(r.work), exhausted: r.exhausted }
+  if (r) return { current: workToCurrent(r.work), exhausted: r.exhausted, type: r.type }
   return null
 }
 
@@ -402,19 +440,22 @@ export async function startTurn(code: string, uid: string, categoryId?: string):
   if (room.mode !== 'quick') await update(ref(rtdb, `${ROOMS}/${code}`), { phase: 'searching' })
 
   const [picked] = await Promise.all([
-    drawWorkForCategories(drawFrom, new Set(room.usedWorkIds || []), uid),
+    drawWorkForCategories(drawFrom, new Set(room.usedWorkIds || []), uid, room.lastPickedType ?? null, room.pickedTypeStreak ?? 0),
     room.mode !== 'quick' ? new Promise(resolve => setTimeout(resolve, 2000)) : Promise.resolve(),
   ])
   if (!picked) {
     await update(ref(rtdb, `${ROOMS}/${code}`), { phase: 'idle' })
     return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
   }
-  const { current, exhausted } = picked
+  const { current, exhausted, type } = picked
+  const newStreak = type === room.lastPickedType ? (room.pickedTypeStreak ?? 0) + 1 : 1
 
   const readSeconds = room.mode === 'quick' ? WK_QUICK_READ_SECONDS : WK_READ_SECONDS
   await update(ref(rtdb, `${ROOMS}/${code}`), {
     currentWork: current,
     usedWorkIds: [...(room.usedWorkIds || []), current.workId],
+    lastPickedType: type,
+    pickedTypeStreak: newStreak,
     phase: 'reading',
     phaseEndsAt: serverNow() + readSeconds * 1000,
     paused: false,
@@ -515,8 +556,16 @@ export async function useJoker(code: string): Promise<JokerOutcome | null> {
     [`powerUpsUsed/${team}/joker`]: true,
     joker: { outcome, ts: Date.now() },
   }
-  if (outcome === 'addPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) + 1
-  else if (outcome === 'deductPoint') patch[`teams/${team}/score`] = Math.max(0, (room.teams[team].score || 0) - 1)
+  // نتيجة نقطة (زيادة/نقصان) تنهي الدور فوراً — تنتقل للفريق الثاني كأي دور عادي انتهى،
+  // بعكس "إعادة تمثيل بعمل جديد" اللي يكمّل فيها نفس الفريق بعمل جديد (بدون إنهاء الدور هنا)
+  if (outcome === 'addPoint' || outcome === 'deductPoint') {
+    const before = room.teams[team].score || 0
+    const after = outcome === 'addPoint' ? before + 1 : Math.max(0, before - 1)
+    patch[`teams/${team}/score`] = after
+    patch.phase = 'resolved'
+    patch.phaseEndsAt = null
+    patch.lastResult = { team, type: 'joker', points: after - before, ts: Date.now() }
+  }
   await update(ref(rtdb, `${ROOMS}/${code}`), patch)
   return outcome
 }

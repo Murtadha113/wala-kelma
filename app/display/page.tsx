@@ -273,6 +273,9 @@ function DisplayInner() {
               {room.lastResult.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'steal' && `🥷 سرقة! نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
+              {room.lastResult.type === 'joker' && (room.lastResult.points > 0
+                ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
+                : `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`)}
             </div>
             {room.currentWork && (
               <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(18px, 2.6vw, 34px)', background: '#fff', borderRadius: 26, padding: 'clamp(18px, 2.4vw, 30px)', border: `1px solid ${C.ink}12`, boxShadow: `0 14px 34px ${C.ink}14`, maxWidth: 780 }}>

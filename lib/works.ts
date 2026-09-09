@@ -108,6 +108,23 @@ export async function getAllWorks(): Promise<WalaKelmaWork[]> {
   }
 }
 
+// يطبّع العنوان للمقارنة (تجاهل المسافات الزايدة وحالة الأحرف) — يُستخدم لكشف التكرار
+export function normalizeTitle(title: string): string {
+  return title.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+// يجمع الأعمال اللي عندها نفس العنوان (بعد التطبيع) بغض النظر عن الفئة — تساعد المشرف
+// يلقط تكرار قديم انزرع بالقاعدة (مثلاً من استيراد أو سحب مكرر)
+export function findDuplicateWorks(works: WalaKelmaWork[]): WalaKelmaWork[][] {
+  const groups = new Map<string, WalaKelmaWork[]>()
+  for (const w of works) {
+    const key = normalizeTitle(w.title)
+    if (!key) continue
+    groups.set(key, [...(groups.get(key) || []), w])
+  }
+  return [...groups.values()].filter(g => g.length > 1)
+}
+
 // ── منع تكرار المحتوى (3 مستويات) ──
 // مستوى 1: داخل نفس المباراة (usedInMatch — يمرره المتصل من room.usedWorkIds)
 // مستوى 2: عبر كل مباريات المستخدم (seenWorks/{uid}/works) — يُستبعد هنا تلقائياً
