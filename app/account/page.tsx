@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthChange, getUserProfile, signOutUser, deleteAccount, type UserProfile } from '@/lib/auth'
 import { clearSeenWorks, type Difficulty } from '@/lib/works'
-import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, type CustomWork } from '@/lib/custom-works'
+import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, CUSTOM_WORK_TYPES, type CustomWork } from '@/lib/custom-works'
+import { uploadImage } from '@/lib/storage'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
 import { GradientBlobs } from '@/components/shared'
 import { BottomNav } from '@/components/bottom-nav'
-import { Gift, CreditCard, Trophy, Star, Check, RefreshCw } from 'lucide-react'
+import { Gift, CreditCard, Trophy, Star, Check, RefreshCw, Upload } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -114,18 +115,32 @@ export default function AccountPage() {
 function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBalance: boolean }) {
   const [works, setWorks] = useState<CustomWork[]>([])
   const [title, setTitle] = useState('')
+  const [type, setType] = useState<string>(CUSTOM_WORK_TYPES[0])
+  const [country, setCountry] = useState('')
   const [hint, setHint] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
+  const [posterUrl, setPosterUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
   const [err, setErr] = useState('')
+  const inputStyle = { flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 13, outline: 'none' } as const
   const reload = () => getCustomWorks(uid).then(setWorks)
   useEffect(() => { reload() }, [uid])
+
+  const uploadPoster = async (file: File) => {
+    setUploading(true); setErr('')
+    try { setPosterUrl(await uploadImage(file, 'custom-works')) }
+    catch (e) { setErr((e as Error).message) }
+    setUploading(false)
+  }
 
   const add = async () => {
     setErr('')
     if (!title.trim()) { setErr('اكتب اسم العمل'); return }
-    const res = await addCustomWork(uid, { title: title.trim(), hint: hint.trim(), difficulty, posterUrl: '' }, hasActiveBalance)
+    const res = await addCustomWork(uid, {
+      title: title.trim(), type, country: country.trim() || null, hint: hint.trim(), difficulty, posterUrl,
+    }, hasActiveBalance)
     if (!res.success) { setErr(res.error); return }
-    setTitle(''); setHint(''); reload()
+    setTitle(''); setCountry(''); setHint(''); setPosterUrl(''); reload()
   }
 
   return (
@@ -136,12 +151,26 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
         {!hasActiveBalance && ` (حد ${FREE_CUSTOM_LIMIT} بدون رصيد نشط، بدون حد مع أي باقة)`}
       </p>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="اسم العمل" style={{ flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 13, outline: 'none' }} />
-        <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)} style={{ padding: 10, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 13 }}>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="اسم العمل" style={inputStyle} />
+        <select value={type} onChange={e => setType(e.target.value)} style={{ ...inputStyle, flex: 'unset' }}>
+          {CUSTOM_WORK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <input value={country} onChange={e => setCountry(e.target.value)} placeholder="البلد (اختياري)" style={inputStyle} />
+        <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)} style={{ ...inputStyle, flex: 'unset' }}>
           <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
         </select>
       </div>
-      <input value={hint} onChange={e => setHint(e.target.value)} placeholder="تلميح للمقدّم (اختياري)" style={{ width: '100%', padding: 10, borderRadius: 10, border: `1px solid ${C.ink}20`, background: C.cream, fontSize: 13, outline: 'none', marginBottom: 8 }} />
+      <input value={hint} onChange={e => setHint(e.target.value)} placeholder="تلميح للمقدّم (اختياري)" style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+        <input value={posterUrl} onChange={e => setPosterUrl(e.target.value)} placeholder="رابط البوستر (اختياري، أو ارفع)" style={{ ...inputStyle, marginBottom: 0 }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.ink}20`, background: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {uploading ? '…' : <><Upload size={13} /> رفع</>}
+          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={e => { const f = e.target.files?.[0]; if (f) uploadPoster(f) }} />
+        </label>
+      </div>
+      {posterUrl && <img src={posterUrl} alt="" style={{ width: 50, borderRadius: 8, marginBottom: 8 }} />}
       {err && <p style={{ color: C.red, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{err}</p>}
       <button onClick={add} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', color: '#fff', fontWeight: 800, fontSize: 13, background: C.violet, cursor: 'pointer', marginBottom: works.length ? 12 : 0 }}>
         + أضف
@@ -150,7 +179,11 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
           {works.map(w => (
             <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: C.cream, borderRadius: 8, fontSize: 13 }}>
-              <span>{w.title}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {w.posterUrl ? <img src={w.posterUrl} alt="" width={22} height={30} style={{ borderRadius: 4, objectFit: 'cover' }} /> : null}
+                <span>{w.title}</span>
+                <span style={{ fontSize: 11, color: `${C.ink}66` }}>{[w.type, w.country].filter(Boolean).join(' · ')}</span>
+              </div>
               <button onClick={async () => { await deleteCustomWork(uid, w.id); reload() }} style={{ color: C.red, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>حذف</button>
             </div>
           ))}

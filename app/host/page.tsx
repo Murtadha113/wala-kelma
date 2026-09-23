@@ -9,18 +9,18 @@ import { getCustomWorksCount, CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@
 import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
-  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, undoJoker, togglePause, resetPhaseTimer,
+  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, togglePause, resetPhaseTimer,
   toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, setRoomRedirect, getBestActor, rematchWithSameSetup,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
 import { WK_COLORS, WK_EXPLAIN_OPTIONS, WK_ROUND_OPTIONS, WK_MAX_CATEGORIES, WK_POWERUPS, WK_QUICK_EXPLAIN, WK_JOKER_OUTCOMES, typeLabelForCategory } from '@/lib/wala-kelma-content'
-import { useWalaKelmaCountdown, useResultSounds, useTimerSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti } from '@/components/shared'
+import { useWalaKelmaCountdown, useResultSounds, useTimerSounds, useWakeLock, PHASE_LABEL, GradientBlobs, Confetti, TeamsRosterModal } from '@/components/shared'
 import { playDrumRollSound } from '@/lib/sound'
 import { ShareResultButton } from '@/components/share-result'
 import { Logo } from '@/components/logo'
 import {
   BookOpen, Drama, Swords, Dices, Zap, Check, AlertTriangle, Eye, EyeOff,
-  Play, Pause, Trophy, Frown, ArrowLeft, Clapperboard,
+  Play, Pause, Trophy, Frown, ArrowLeft, Clapperboard, Users,
 } from 'lucide-react'
 
 const C = WK_COLORS
@@ -462,13 +462,14 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const [scoreConfirm, setScoreConfirm] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null)
   const [jokerSpinning, setJokerSpinning] = useState(false)
   const [spinFace, setSpinFace] = useState(0)
+  const [showTeams, setShowTeams] = useState(false)
   const [cats, setCats] = useState<WKCategory[]>([])
   const w = room.currentWork
 
   useEffect(() => { getCategories(true).then(setCats) }, [])
 
   const typeLabel = w
-    ? (w.categoryId === CUSTOM_CATEGORY_ID ? 'من فئتك الخاصة' : typeLabelForCategory(cats.find(c => c.id === w.categoryId)?.name || ''))
+    ? (w.categoryId === CUSTOM_CATEGORY_ID ? (w.customType || 'من فئتك الخاصة') : typeLabelForCategory(cats.find(c => c.id === w.categoryId)?.name || ''))
     : ''
 
   const handleStartTurn = async () => {
@@ -492,8 +493,12 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         <div style={{ fontSize: 13, color: `${C.ink}88`, fontWeight: 700 }}>
           {room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound}/${room.totalRounds} — سؤال ${Math.min((room.turnsThisRound || 0) + 1, room.questionsPerRound || 1)}/${room.questionsPerRound}`}
         </div>
-        <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}66`, letterSpacing: '0.15em' }}>{room.code}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => setShowTeams(true)} title="الفرق واللاعبين" style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${C.ink}20`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Users size={14} /></button>
+          <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}66`, letterSpacing: '0.15em' }}>{room.code}</div>
+        </div>
       </div>
+      {showTeams && <TeamsRosterModal room={room} onClose={() => setShowTeams(false)} />}
       {turnErr && <Card><p style={{ color: C.red, fontWeight: 700, fontSize: 13, margin: 0 }}>{turnErr}</p></Card>}
 
       <div style={{ display: 'flex', gap: 10 }}>
@@ -631,23 +636,12 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
 
           <div style={{ display: 'flex', gap: 8 }}>
             {!room.powerUpsUsed[team].joker && !jokerSpinning && (
-              <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'نتيجة عشوائية — إضافة نقطة، خصم نقطة، أو إعادة تمثيل بعمل جديد.', onConfirm: runJokerSpin })} className="wk-breathe"
+              <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'ينهي الدور فوراً — إضافة نقطة، خصم نقطة، أو بدون نقطة (إعادة).', onConfirm: runJokerSpin })} className="wk-breathe"
                 style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>جوكر</button>
             )}
             <button onClick={() => togglePause(room.code)} title={room.paused ? 'استئناف' : 'إيقاف'} style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{room.paused ? <Play size={16} /> : <Pause size={16} />}</button>
             <button onClick={() => resetPhaseTimer(room.code)} style={{ ...ghostBtn, flex: 1 }}>إعادة الوقت</button>
           </div>
-          {room.joker && !jokerSpinning && (
-            <div className="wk-pop-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: C.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Dices size={16} /> نتيجة الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
-              </div>
-              {room.joker.outcome === 'redoWithNewWork' && (
-                <button onClick={() => startTurn(room.code, room.hostId)} style={{ ...ghostBtn, borderColor: '#27AE78', color: '#27AE78' }}>اسحب العمل الجديد</button>
-              )}
-              <button onClick={() => undoJoker(room.code)} style={{ ...ghostBtn, borderColor: C.red, color: C.red }}>تراجع</button>
-            </div>
-          )}
           <SkipCancelRow room={room} setEndConfirm={setEndConfirm} setScoreConfirm={setScoreConfirm} />
         </>
       )}
@@ -665,13 +659,14 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
         <>
           <Confetti key={room.lastResult?.ts} count={12} active={!!room.lastResult && room.lastResult.points > 0} />
           <Card>
-            <div key={room.lastResult?.ts} className="wk-pop-in" style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, color: room.lastResult?.points ? '#27AE78' : `${C.ink}88` }}>
+            <div key={room.lastResult?.ts} className="wk-pop-in" style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, color: room.lastResult && room.lastResult.points > 0 ? '#27AE78' : room.lastResult && room.lastResult.points < 0 ? C.red : `${C.ink}88` }}>
               {room.lastResult?.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'steal' && `🥷 سرقة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult?.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
-              {room.lastResult?.type === 'joker' && (room.lastResult.points > 0
-                ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
-                : `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`)}
+              {room.lastResult?.type === 'joker' && (
+                room.lastResult.points > 0 ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
+                : room.lastResult.points < 0 ? `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`
+                : '🎲 الجوكر: إعادة — بدون نقطة')}
             </div>
           </Card>
           <button onClick={() => nextTurn(room.code)} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>الدور التالي <ArrowLeft size={17} /></button>

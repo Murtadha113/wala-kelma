@@ -271,3 +271,37 @@ export function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
   else document.exitFullscreen?.().catch(() => {})
 }
+
+// نافذة "الفرق واللاعبين" — تُفتح بأي وقت أثناء اللعب (مو بس بشاشة القرعة) من زر مشترك
+// بشاشة المقدّم وشاشة العرض، عشان يتأكدون من التوزيع بدون ما ينتظرون شاشة القرعة ترجع
+export function TeamsRosterModal({ room, onClose }: { room: WalaKelmaRoom; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 95, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} className="wk-pop-in" style={{ background: '#fff', borderRadius: 20, padding: 20, maxWidth: 520, width: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: C.ink }}>الفرق واللاعبين</div>
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${C.ink}20`, background: C.cream, cursor: 'pointer', fontSize: 14, color: C.ink }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {(['A', 'B'] as TeamId[]).map(id => {
+            const tc = id === 'A' ? C.violet : C.red
+            return (
+              <div key={id} style={{ flex: '1 1 180px', border: `2px solid ${tc}2a`, borderRadius: 16, padding: 14 }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 10 }}>{room.teams[id].name}</div>
+                {room.teams[id].players.length === 0 ? (
+                  <div style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}66` }}>فرق فقط — بدون أسماء لاعبين</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {room.teams[id].players.map(p => (
+                      <div key={p.id} style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.ink, background: `${tc}0d`, borderRadius: 10, padding: '7px 8px' }}>{p.name}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}

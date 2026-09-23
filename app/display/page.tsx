@@ -9,11 +9,11 @@ import { WK_COLORS, typeLabelForCategory } from '@/lib/wala-kelma-content'
 import { serverNow } from '@/lib/firebase'
 import {
   useWalaKelmaCountdown, useResultSounds, useTimerSounds, phaseTotal, PHASE_LABEL,
-  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs, Confetti,
+  TimerRing, ScoreBoard, PowerUpsGrid, useWakeLock, toggleFullscreen, GradientBlobs, Confetti, TeamsRosterModal,
 } from '@/components/shared'
 import { playDrumRollSound, playWinSound } from '@/lib/sound'
 import { Logo } from '@/components/logo'
-import { Volume2, VolumeX, Maximize, Tv, Trophy, Zap, MicOff, Pause, Dices, Drama } from 'lucide-react'
+import { Volume2, VolumeX, Maximize, Tv, Trophy, Zap, MicOff, Pause, Dices, Drama, Users } from 'lucide-react'
 
 const C = WK_COLORS
 
@@ -30,6 +30,7 @@ function DisplayInner() {
   const wasTiebreak = useRef(false)
   const [newGameOpen, setNewGameOpen] = useState(false)
   const [newGameCode, setNewGameCode] = useState('')
+  const [showTeams, setShowTeams] = useState(false)
 
   useEffect(() => {
     if (!code) { router.replace('/'); return }
@@ -177,7 +178,7 @@ function DisplayInner() {
     ? [...room.teams.A.players, ...room.teams.B.players].find(p => p.id === room.silencedPlayerId)?.name
     : null
   const answerTypeLabel = room.currentWork
-    ? (room.currentWork.categoryId === CUSTOM_CATEGORY_ID ? CUSTOM_CATEGORY_NAME : typeLabelForCategory(cats.find(c => c.id === room.currentWork!.categoryId)?.name || ''))
+    ? (room.currentWork.categoryId === CUSTOM_CATEGORY_ID ? (room.currentWork.customType || CUSTOM_CATEGORY_NAME) : typeLabelForCategory(cats.find(c => c.id === room.currentWork!.categoryId)?.name || ''))
     : ''
 
   return (
@@ -217,7 +218,12 @@ function DisplayInner() {
           style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.ink}18`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Maximize size={16} />
         </button>
+        <button onClick={() => setShowTeams(true)} title="الفرق واللاعبين"
+          style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.ink}18`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Users size={16} />
+        </button>
       </div>
+      {showTeams && <TeamsRosterModal room={room} onClose={() => setShowTeams(false)} />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Logo height={30} />
         <div style={{ textAlign: 'center' }}>
@@ -269,13 +275,14 @@ function DisplayInner() {
         {room.phase === 'resolved' && room.lastResult && (
           <>
             <Confetti key={`c-${room.lastResult.ts}`} count={14} active={room.lastResult.points > 0} />
-            <div key={`r-${room.lastResult.ts}`} className="wk-pop-in" style={{ fontSize: 'clamp(24px, 3.8vw, 52px)', fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : `${C.ink}88`, textAlign: 'center' }}>
+            <div key={`r-${room.lastResult.ts}`} className="wk-pop-in" style={{ fontSize: 'clamp(24px, 3.8vw, 52px)', fontWeight: 900, color: room.lastResult.points > 0 ? '#27AE78' : room.lastResult.points < 0 ? C.red : `${C.ink}88`, textAlign: 'center' }}>
               {room.lastResult.type === 'correct' && `✅ نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'steal' && `🥷 سرقة! نقطة لـ ${room.teams[room.lastResult.team as TeamId].name}`}
               {room.lastResult.type === 'timeout' && '⏱ انتهى الوقت — ولا نقطة'}
-              {room.lastResult.type === 'joker' && (room.lastResult.points > 0
-                ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
-                : `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`)}
+              {room.lastResult.type === 'joker' && (
+                room.lastResult.points > 0 ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
+                : room.lastResult.points < 0 ? `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`
+                : '🎲 الجوكر: إعادة — بدون نقطة')}
             </div>
             {room.currentWork && (
               <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(18px, 2.6vw, 34px)', background: '#fff', borderRadius: 26, padding: 'clamp(18px, 2.4vw, 30px)', border: `1px solid ${C.ink}12`, boxShadow: `0 14px 34px ${C.ink}14`, maxWidth: 780 }}>

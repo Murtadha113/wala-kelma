@@ -9,9 +9,16 @@ export const CUSTOM_CATEGORY_ID = 'custom'
 export const CUSTOM_CATEGORY_NAME = '⭐ فئتي الخاصة'
 export const FREE_CUSTOM_LIMIT = 50
 
+// أنواع الأعمال المتاحة بالفئة المخصصة — نفس مفهوم "النوع" المشتق للفئات الحقيقية (typeLabelForCategory)
+// لكن هنا يختاره المستخدم صراحة لأن الفئة المخصصة ما عندها فئة حقيقية نشتق منها النوع
+export const CUSTOM_WORK_TYPES = ['فيلم', 'مسلسل', 'مسرحية', 'مثل شعبي', 'برنامج', 'أخرى'] as const
+export type CustomWorkType = typeof CUSTOM_WORK_TYPES[number]
+
 export interface CustomWork {
   id: string
   title: string
+  type: string
+  country: string | null
   hint: string
   difficulty: Difficulty
   posterUrl: string

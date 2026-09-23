@@ -32,6 +32,7 @@ export interface WKPowerUpsUsed { double: boolean; deduct: boolean; silence: boo
 export interface WKCurrentWork {
   workId: string; title: string; posterUrl: string
   year: number | null; country: string | null; actors: string[]; extraInfo: string; categoryId: string
+  customType?: string | null   // نوع العمل المصرّح به يدوياً للأعمال المخصصة (فئة "مخصص" ما عندها فئة حقيقية نشتق النوع منها)
 }
 
 export interface WalaKelmaRoom {
@@ -364,8 +365,8 @@ function workToCurrent(w: WalaKelmaWork): WKCurrentWork {
 function customWorkToCurrent(w: CustomWork): WKCurrentWork {
   return {
     workId: w.id, title: w.title, posterUrl: w.posterUrl || '',
-    year: null, country: null, actors: [], extraInfo: w.hint || '',
-    categoryId: CUSTOM_CATEGORY_ID,
+    year: null, country: w.country || null, actors: [], extraInfo: w.hint || '',
+    categoryId: CUSTOM_CATEGORY_ID, customType: w.type || null,
   }
 }
 
@@ -552,39 +553,23 @@ export async function useJoker(code: string): Promise<JokerOutcome | null> {
 
   const outcome = drawJokerOutcome()
   const team = room.activeTeam
+  const before = room.teams[team].score || 0
+  const after = outcome === 'addPoint' ? before + 1 : outcome === 'deductPoint' ? Math.max(0, before - 1) : before
   const patch: Record<string, unknown> = {
     [`powerUpsUsed/${team}/joker`]: true,
     joker: { outcome, ts: Date.now() },
   }
-  // نتيجة نقطة (زيادة/نقصان) تنهي الدور فوراً — تنتقل للفريق الثاني كأي دور عادي انتهى،
-  // بعكس "إعادة تمثيل بعمل جديد" اللي يكمّل فيها نفس الفريق بعمل جديد (بدون إنهاء الدور هنا)
-  if (outcome === 'addPoint' || outcome === 'deductPoint') {
-    const before = room.teams[team].score || 0
-    const after = outcome === 'addPoint' ? before + 1 : Math.max(0, before - 1)
-    patch[`teams/${team}/score`] = after
-    patch.phase = 'resolved'
-    patch.phaseEndsAt = null
-    patch.lastResult = { team, type: 'joker', points: after - before, ts: Date.now() }
-  }
+  // الجوكر بكل نتائجه الثلاث (زيادة/نقصان/إعادة) ينهي الدور فوراً وينتقل للفريق الثاني —
+  // "إعادة تمثيل" هنا معناها لا نقطة ولا خصم (بدل ما تكمّل بعمل جديد لنفس الفريق كما كان سابقاً)،
+  // والعمل الحالي يُكشف بشاشة النتيجة زي أي دور طبيعي ينتهي
+  if (after !== before) patch[`teams/${team}/score`] = after
+  patch.phase = 'resolved'
+  patch.phaseEndsAt = null
+  patch.lastResult = { team, type: 'joker', points: after - before, ts: Date.now() }
   await update(ref(rtdb, `${ROOMS}/${code}`), patch)
   return outcome
 }
 
-// تراجع عن نتيجة الجوكر (لو اتفعّل بالغلط) — يرجّع النقاط ويسمح باستخدامه من جديد
-export async function undoJoker(code: string): Promise<void> {
-  const snap = await get(ref(rtdb, `${ROOMS}/${code}`))
-  if (!snap.exists()) return
-  const room = snap.val() as WalaKelmaRoom
-  if (!room.joker) return
-  const team = room.activeTeam
-  const patch: Record<string, unknown> = {
-    [`powerUpsUsed/${team}/joker`]: false,
-    joker: null,
-  }
-  if (room.joker.outcome === 'addPoint') patch[`teams/${team}/score`] = Math.max(0, (room.teams[team].score || 0) - 1)
-  else if (room.joker.outcome === 'deductPoint') patch[`teams/${team}/score`] = (room.teams[team].score || 0) + 1
-  await update(ref(rtdb, `${ROOMS}/${code}`), patch)
-}
 
 // ── الانتقال بين الأدوار والجولات ──
 export async function nextTurn(code: string): Promise<void> {
