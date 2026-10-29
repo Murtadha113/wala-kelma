@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthChange, getUserProfile, signOutUser, deleteAccount, type UserProfile } from '@/lib/auth'
 import { clearSeenWorks, type Difficulty } from '@/lib/works'
-import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, CUSTOM_WORK_TYPES, type CustomWork } from '@/lib/custom-works'
+import { getCustomWorks, addCustomWork, deleteCustomWork, FREE_CUSTOM_LIMIT, CUSTOM_WORK_TYPES, CUSTOM_OTHER_TYPE, type CustomWork } from '@/lib/custom-works'
 import { uploadImage } from '@/lib/storage'
 import { WK_COLORS } from '@/lib/wala-kelma-content'
 import { Logo } from '@/components/logo'
@@ -116,6 +116,7 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
   const [works, setWorks] = useState<CustomWork[]>([])
   const [title, setTitle] = useState('')
   const [type, setType] = useState<string>(CUSTOM_WORK_TYPES[0])
+  const [otherType, setOtherType] = useState('')
   const [country, setCountry] = useState('')
   const [hint, setHint] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
@@ -136,8 +137,9 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
   const add = async () => {
     setErr('')
     if (!title.trim()) { setErr('اكتب اسم العمل'); return }
+    if (type === CUSTOM_OTHER_TYPE && !otherType.trim()) { setErr('اكتب نوع العمل'); return }
     const res = await addCustomWork(uid, {
-      title: title.trim(), type, country: country.trim() || null, hint: hint.trim(), difficulty, posterUrl,
+      title: title.trim(), type: type === CUSTOM_OTHER_TYPE ? otherType.trim() : type, country: country.trim() || null, hint: hint.trim(), difficulty, posterUrl,
     }, hasActiveBalance)
     if (!res.success) { setErr(res.error); return }
     setTitle(''); setCountry(''); setHint(''); setPosterUrl(''); reload()
@@ -156,6 +158,9 @@ function CustomWorksCard({ uid, hasActiveBalance }: { uid: string; hasActiveBala
           {CUSTOM_WORK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
+      {type === CUSTOM_OTHER_TYPE && (
+        <input value={otherType} onChange={e => setOtherType(e.target.value)} placeholder="اكتب نوع العمل (مثلاً: دعاء، أغنية، شخصية)" autoFocus style={{ ...inputStyle, width: '100%', marginBottom: 6 }} />
+      )}
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
         <input value={country} onChange={e => setCountry(e.target.value)} placeholder="البلد (اختياري)" style={inputStyle} />
         <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)} style={{ ...inputStyle, flex: 'unset' }}>

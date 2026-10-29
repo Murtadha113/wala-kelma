@@ -131,23 +131,55 @@ export function findDuplicateWorks(works: WalaKelmaWork[]): WalaKelmaWork[][] {
 // مستوى 3: لو نفدت كل الأعمال الجديدة، نعيد الأقدم مشاهدة (cooldown) بدل ما نوقف اللعبة
 export const SEEN_WORKS = 'seenWorks'
 
-export async function getSeenWorkIds(uid: string): Promise<Map<string, number>> {
-  try {
-    const snap = await getDocs(collection(db, SEEN_WORKS, uid, 'works'))
-    return new Map(snap.docs.map(d => [d.id, (d.data().seenAt as number) ?? 0]))
-  } catch {
-    return new Map()
-  }
+// ── كاش بالذاكرة لسحب الأعمال ──
+// قبل: كل دور يقرأ كل أعمال الفئة + سجل "شافها" كامل (يكبر للأبد مع كل مباراة) من Firestore، ويعيد
+// قراءتهم لكل فئة يجرّبها لو الأولى نفدت — مع حساب قديم وشبكة جوال بطيئة كان اختيار العمل يوصل فوق الدقيقة.
+// الحين نقرأهم مرة وحدة بالجلسة ونحدّث السجل محلياً؛ الأعمال تتجدد كل WORKS_TTL عشان إضافات الأدمن توصل.
+const WORKS_TTL = 10 * 60 * 1000
+const worksCache = new Map<string, { at: number; works: Promise<WalaKelmaWork[]> }>()
+const seenCache = new Map<string, Promise<Map<string, number>>>()
+
+function getActiveWorksInCategory(categoryId: string): Promise<WalaKelmaWork[]> {
+  const hit = worksCache.get(categoryId)
+  if (hit && Date.now() - hit.at < WORKS_TTL) return hit.works
+  const works = getDocs(query(
+    collection(db, WORKS),
+    where('categoryId', '==', categoryId),
+    where('isActive', '==', true),
+  )).then(snap => snap.docs.map(d => ({ ...d.data(), id: d.id } as WalaKelmaWork)))
+  works.catch(() => worksCache.delete(categoryId))   // فشل الشبكة ما ينحفظ — المحاولة الجاية تعيد القراءة
+  worksCache.set(categoryId, { at: Date.now(), works })
+  return works
 }
 
-export async function markWorkSeen(uid: string, workId: string, categoryId: string): Promise<void> {
-  try {
-    await setDoc(doc(db, SEEN_WORKS, uid, 'works', workId), { seenAt: Date.now(), categoryId })
-  } catch { /* silent — لا نوقف اللعبة لو فشل التسجيل */ }
+// تحميل مسبق لأعمال فئات المباراة وسجل "شافها" — المقدّم يستدعيه أول ما تفتح لوحة التحكم،
+// عشان حتى أول دور ما ينتظر القراءة
+export function prefetchWorks(categoryIds: string[], uid?: string): void {
+  categoryIds.forEach(id => { getActiveWorksInCategory(id).catch(() => {}) })
+  if (uid) getSeenWorkIds(uid).catch(() => {})
+}
+
+export function getSeenWorkIds(uid: string): Promise<Map<string, number>> {
+  const hit = seenCache.get(uid)
+  if (hit) return hit
+  const seen = getDocs(collection(db, SEEN_WORKS, uid, 'works'))
+    .then(snap => new Map(snap.docs.map(d => [d.id, (d.data().seenAt as number) ?? 0])))
+    .catch(() => { seenCache.delete(uid); return new Map<string, number>() })
+  seenCache.set(uid, seen)
+  return seen
+}
+
+// ما ننتظر الكتابة — العمل يطلع للمقدّم فوراً والتسجيل يكمل بالخلفية
+export function markWorkSeen(uid: string, workId: string, categoryId: string): void {
+  const now = Date.now()
+  seenCache.get(uid)?.then(m => m.set(workId, now))
+  setDoc(doc(db, SEEN_WORKS, uid, 'works', workId), { seenAt: now, categoryId })
+    .catch(() => { /* silent — لا نوقف اللعبة لو فشل التسجيل */ })
 }
 
 // يمسح سجل "شاهدته" بالكامل — زر "نسيت الأعمال" بصفحة الحساب
 export async function clearSeenWorks(uid: string): Promise<void> {
+  seenCache.delete(uid)
   const snap = await getDocs(collection(db, SEEN_WORKS, uid, 'works'))
   if (snap.empty) return
   const batch = writeBatch(db)
@@ -173,15 +205,11 @@ export async function pickRandomWork(
   try {
     // نجيب أعمال الفئة وسجل "شافها قبل" بنفس الوقت (مو الواحد ورا الثاني) —
     // يقلّل زمن الانتظار بشاشة "جاري البحث عن سؤال" لما الشبكة بطيئة
-    const [snap, seenMap] = await Promise.all([
-      getDocs(query(
-        collection(db, WORKS),
-        where('categoryId', 'in', cats),
-        where('isActive', '==', true),
-      )),
+    const [worksByCat, seenMap] = await Promise.all([
+      Promise.all(cats.map(getActiveWorksInCategory)),
       uid ? getSeenWorkIds(uid) : Promise.resolve(new Map<string, number>()),
     ])
-    const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as WalaKelmaWork))
+    const all = worksByCat.flat()
 
     // مستوى 1: استبعاد أعمال هذي المباراة
     const notUsedThisMatch = all.filter(w => !usedInMatch.has(w.id))
@@ -191,7 +219,7 @@ export async function pickRandomWork(
     const neverSeen = notUsedThisMatch.filter(w => !seenMap.has(w.id))
     if (neverSeen.length > 0) {
       const work = neverSeen[Math.floor(Math.random() * neverSeen.length)]
-      if (uid) await markWorkSeen(uid, work.id, work.categoryId)
+      if (uid) markWorkSeen(uid, work.id, work.categoryId)
       return { work, exhausted: false }
     }
 
@@ -202,7 +230,7 @@ export async function pickRandomWork(
     const poolSize = Math.max(1, Math.ceil(sorted.length * 0.3))
     const pool = sorted.slice(0, poolSize)
     const oldest = pool[Math.floor(Math.random() * pool.length)]
-    if (uid) await markWorkSeen(uid, oldest.id, oldest.categoryId)
+    if (uid) markWorkSeen(uid, oldest.id, oldest.categoryId)
     return { work: oldest, exhausted: true }
   } catch (e) {
     console.error('pickRandomWork query failed:', e)

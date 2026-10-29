@@ -272,28 +272,29 @@ export function toggleFullscreen() {
   else document.exitFullscreen?.().catch(() => {})
 }
 
-// نافذة "الفرق واللاعبين" — تُفتح بأي وقت أثناء اللعب (مو بس بشاشة القرعة) من زر مشترك
-// بشاشة المقدّم وشاشة العرض، عشان يتأكدون من التوزيع بدون ما ينتظرون شاشة القرعة ترجع
-export function TeamsRosterModal({ room, onClose }: { room: WalaKelmaRoom; onClose: () => void }) {
+// نافذة "الفرق واللاعبين" — تُفتح بأي وقت أثناء اللعب. زر المقدّم يفتحها بالشاشتين مع بعض (room.teamsPopup)،
+// و size="lg" لشاشة العرض (تلفزيون يشوفونه من بعيد)
+export function TeamsRosterModal({ room, onClose, size = 'md' }: { room: WalaKelmaRoom; onClose: () => void; size?: 'md' | 'lg' }) {
+  const lg = size === 'lg'
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,32,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 95, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="wk-pop-in" style={{ background: '#fff', borderRadius: 20, padding: 20, maxWidth: 520, width: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, color: C.ink }}>الفرق واللاعبين</div>
+      <div onClick={e => e.stopPropagation()} className="wk-pop-in" style={{ background: '#fff', borderRadius: lg ? 28 : 20, padding: lg ? 'clamp(20px, 3vw, 44px)' : 20, maxWidth: lg ? 'min(1200px, 92vw)' : 520, width: '100%', maxHeight: lg ? '90vh' : '80vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: lg ? 24 : 14 }}>
+          <div style={{ fontSize: lg ? 'clamp(24px, 3.4vw, 48px)' : 16, fontWeight: 900, color: C.ink }}>الفرق واللاعبين</div>
           <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${C.ink}20`, background: C.cream, cursor: 'pointer', fontSize: 14, color: C.ink }}>✕</button>
         </div>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: lg ? 'clamp(16px, 2.4vw, 36px)' : 14, flexWrap: 'wrap' }}>
           {(['A', 'B'] as TeamId[]).map(id => {
             const tc = id === 'A' ? C.violet : C.red
             return (
-              <div key={id} style={{ flex: '1 1 180px', border: `2px solid ${tc}2a`, borderRadius: 16, padding: 14 }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: 10 }}>{room.teams[id].name}</div>
+              <div key={id} style={{ flex: '1 1 180px', border: `2px solid ${tc}2a`, borderRadius: lg ? 24 : 16, padding: lg ? 'clamp(14px, 2vw, 28px)' : 14 }}>
+                <div style={{ fontSize: lg ? 'clamp(24px, 3.4vw, 50px)' : 16, fontWeight: 900, color: tc, textAlign: 'center', marginBottom: lg ? 16 : 10 }}>{room.teams[id].name}</div>
                 {room.teams[id].players.length === 0 ? (
-                  <div style={{ textAlign: 'center', fontSize: 13, color: `${C.ink}66` }}>فرق فقط — بدون أسماء لاعبين</div>
+                  <div style={{ textAlign: 'center', fontSize: lg ? 'clamp(15px, 1.8vw, 24px)' : 13, color: `${C.ink}66` }}>فرق فقط — بدون أسماء لاعبين</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: lg ? 10 : 6 }}>
                     {room.teams[id].players.map(p => (
-                      <div key={p.id} style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.ink, background: `${tc}0d`, borderRadius: 10, padding: '7px 8px' }}>{p.name}</div>
+                      <div key={p.id} style={{ textAlign: 'center', fontSize: lg ? 'clamp(18px, 2.6vw, 38px)' : 14, fontWeight: 800, color: C.ink, background: `${tc}0d`, borderRadius: lg ? 14 : 10, padding: lg ? 'clamp(8px, 1vw, 14px) 10px' : '7px 8px' }}>{p.name}</div>
                     ))}
                   </div>
                 )}

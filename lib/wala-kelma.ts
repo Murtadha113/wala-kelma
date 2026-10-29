@@ -66,6 +66,7 @@ export interface WalaKelmaRoom {
   paused: boolean
   pausedRemainingMs: number | null
   questionHidden: boolean
+  teamsPopup?: boolean   // المقدّم فتح نافذة "الفرق واللاعبين" — تطلع بالشاشتين مع بعض
   categoryExhausted?: boolean   // نفدت الأعمال الجديدة بالفئات المختارة (نعرض للمقدم تنبيه)
 
   usedWorkIds: string[]
@@ -370,6 +371,15 @@ function customWorkToCurrent(w: CustomWork): WKCurrentWork {
   }
 }
 
+// أسماء الفئات (لاشتقاق النوع) ما تتغير وسط المباراة — نقراها مرة كل 10 دقايق بدل كل دور
+let categoriesCache: { at: number; cats: ReturnType<typeof getCategories> } | null = null
+function getCategoriesCached(): ReturnType<typeof getCategories> {
+  if (!categoriesCache || Date.now() - categoriesCache.at > 10 * 60 * 1000) {
+    categoriesCache = { at: Date.now(), cats: getCategories() }
+  }
+  return categoriesCache.cats
+}
+
 // يسحب عمل من مزيج الفئات المختارة (الحقيقية + المخصصة لو مختارة) — 50/50 بين المصدرين لو الاثنين مختارين،
 // مع fallback للمصدر الثاني لو الأول نفد
 async function drawWorkForCategories(
@@ -388,7 +398,7 @@ async function drawWorkForCategories(
   // ما يتكرر ثالث مرة — التوزيع العشوائي البحت ما يمنع صدفة 3 متتالية، وهذا قيد صريح يمنعها
   const tryReal = async () => {
     if (realCats.length === 0) return null
-    const allCats = await getCategories()
+    const allCats = await getCategoriesCached()
     const nameById = new Map(allCats.map(c => [c.id, c.name]))
     const typeOf = (id: string) => typeLabelForCategory(nameById.get(id) || '')
     const groups = new Map<string, string[]>()
@@ -844,6 +854,10 @@ export async function resetPhaseTimer(code: string): Promise<void> {
     paused: false,
     pausedRemainingMs: null,
   })
+}
+
+export async function setTeamsPopup(code: string, open: boolean): Promise<void> {
+  await update(ref(rtdb, `${ROOMS}/${code}`), { teamsPopup: open })
 }
 
 export async function toggleQuestionHidden(code: string, hidden: boolean): Promise<void> {

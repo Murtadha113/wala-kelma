@@ -11,7 +11,9 @@ export const FREE_CUSTOM_LIMIT = 50
 
 // أنواع الأعمال المتاحة بالفئة المخصصة — نفس مفهوم "النوع" المشتق للفئات الحقيقية (typeLabelForCategory)
 // لكن هنا يختاره المستخدم صراحة لأن الفئة المخصصة ما عندها فئة حقيقية نشتق منها النوع
-export const CUSTOM_WORK_TYPES = ['فيلم', 'مسلسل', 'مسرحية', 'مثل شعبي', 'برنامج', 'أخرى'] as const
+export const CUSTOM_WORK_TYPES = ['فيلم', 'مسلسل', 'مسرحية', 'مثل شعبي', 'برنامج', 'قصيدة', 'كتاب', 'أخرى'] as const
+// "أخرى" ما تنحفظ كنوع — يكتب المستخدم اسم النوع بنفسه (مثلاً "دعاء"، "أغنية")
+export const CUSTOM_OTHER_TYPE = 'أخرى'
 export type CustomWorkType = typeof CUSTOM_WORK_TYPES[number]
 
 export interface CustomWork {

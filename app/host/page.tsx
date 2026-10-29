@@ -4,12 +4,12 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { onAuthChange, getUserProfile, type UserProfile } from '@/lib/auth'
-import { getCategories, WKCategory } from '@/lib/works'
+import { getCategories, WKCategory, prefetchWorks } from '@/lib/works'
 import { getCustomWorksCount, CUSTOM_CATEGORY_ID, CUSTOM_CATEGORY_NAME } from '@/lib/custom-works'
 import {
   createWalaKelmaRoom, subscribeToWalaKelmaRoom, updateWKHostHeartbeat,
   updateMatchSetup, startMatch, beginPlaying, startTurn, beginActing, markCorrect, markWrong,
-  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, togglePause, resetPhaseTimer,
+  onStealTimeUp, nextTurn, continueAfterRound, activatePowerUp, deactivatePowerUp, useJoker, togglePause, resetPhaseTimer, setTeamsPopup,
   toggleQuestionHidden, adjustScore, skipTurn, cancelMatch, deleteWalaKelmaRoom, setRoomRedirect, getBestActor, rematchWithSameSetup,
   WalaKelmaRoom, TeamId, WKPlayer,
 } from '@/lib/wala-kelma'
@@ -130,6 +130,8 @@ function SetupWizard({ room }: { room: WalaKelmaRoom }) {
   const [showHelp, setShowHelp] = useState(false)
 
   useEffect(() => { getCategories(true).then(setCats) }, [])
+  // تحميل أعمال فئات المباراة مسبقاً — أول "ابدأ" ما ينتظر القراءة من Firestore
+  useEffect(() => { prefetchWorks(room.categories.filter(id => id !== CUSTOM_CATEGORY_ID), room.hostId) }, [room.categories.join(','), room.hostId])
   useEffect(() => { getCustomWorksCount(room.hostId).then(setCustomCount) }, [room.hostId])
 
   const toggleCat = (id: string) => setSelected(prev =>
@@ -462,7 +464,6 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
   const [scoreConfirm, setScoreConfirm] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null)
   const [jokerSpinning, setJokerSpinning] = useState(false)
   const [spinFace, setSpinFace] = useState(0)
-  const [showTeams, setShowTeams] = useState(false)
   const [cats, setCats] = useState<WKCategory[]>([])
   const w = room.currentWork
 
@@ -494,11 +495,11 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           {room.isTiebreak ? 'الجولة الفاصلة' : `الجولة ${room.currentRound}/${room.totalRounds} — سؤال ${Math.min((room.turnsThisRound || 0) + 1, room.questionsPerRound || 1)}/${room.questionsPerRound}`}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => setShowTeams(true)} title="الفرق واللاعبين" style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${C.ink}20`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Users size={14} /></button>
+          <button onClick={() => setTeamsPopup(room.code, true)} title="الفرق واللاعبين (تطلع بالشاشتين)" style={{ height: 30, padding: '0 10px', borderRadius: 999, border: `1px solid ${C.ink}20`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: C.ink }}><Users size={14} /> الفرق</button>
           <div style={{ fontSize: 13, fontWeight: 800, color: `${C.ink}66`, letterSpacing: '0.15em' }}>{room.code}</div>
         </div>
       </div>
-      {showTeams && <TeamsRosterModal room={room} onClose={() => setShowTeams(false)} />}
+      {room.teamsPopup && <TeamsRosterModal room={room} onClose={() => setTeamsPopup(room.code, false)} />}
       {turnErr && <Card><p style={{ color: C.red, fontWeight: 700, fontSize: 13, margin: 0 }}>{turnErr}</p></Card>}
 
       <div style={{ display: 'flex', gap: 10 }}>
@@ -635,8 +636,9 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
           )}
 
           <div style={{ display: 'flex', gap: 8 }}>
-            {!room.powerUpsUsed[team].joker && !jokerSpinning && (
-              <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'ينهي الدور فوراً — إضافة نقطة، خصم نقطة، أو بدون نقطة (إعادة).', onConfirm: runJokerSpin })} className="wk-breathe"
+            {/* الجوكر لفريق الدور فقط — وقت السرقة الدور صار للفريق الثاني، و useJoker يرفضه أصلاً (كان الزر يطلع ويدور بدون نتيجة) */}
+            {room.phase !== 'stealing' && !room.powerUpsUsed[team].joker && !jokerSpinning && (
+              <button onClick={() => setScoreConfirm({ title: 'تفعيل الجوكر؟', desc: 'ينهي الدور فوراً ويكشف العمل — إضافة نقطة، خصم نقطة، أو إعادة بدون نقطة.', onConfirm: runJokerSpin })} className="wk-breathe"
                 style={{ ...ghostBtn, flex: 1, borderColor: C.orange, color: C.orange, ['--wk-glow' as string]: 'rgba(242,107,33,0.45)' } as React.CSSProperties}>جوكر</button>
             )}
             <button onClick={() => togglePause(room.code)} title={room.paused ? 'استئناف' : 'إيقاف'} style={{ ...ghostBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{room.paused ? <Play size={16} /> : <Pause size={16} />}</button>
@@ -666,8 +668,17 @@ function ControlPanel({ room, timeLeft }: { room: WalaKelmaRoom; timeLeft: numbe
               {room.lastResult?.type === 'joker' && (
                 room.lastResult.points > 0 ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
                 : room.lastResult.points < 0 ? `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`
-                : '🎲 الجوكر: إعادة — بدون نقطة')}
+                : '🎲 الجوكر: إعادة — بدون نقطة، الدور انتهى')}
             </div>
+            {w && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.ink}10` }}>
+                {w.posterUrl && <img src={w.posterUrl} alt="" width={48} height={66} style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
+                <div>
+                  <div style={{ fontSize: 11, color: `${C.ink}77`, fontWeight: 700 }}>العمل كان{typeLabel ? ` (${typeLabel})` : ''}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: C.ink }}>{w.title}</div>
+                </div>
+              </div>
+            )}
           </Card>
           <button onClick={() => nextTurn(room.code)} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>الدور التالي <ArrowLeft size={17} /></button>
         </>

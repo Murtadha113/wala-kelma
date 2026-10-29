@@ -9,11 +9,13 @@ import {
 } from '@/lib/works'
 import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/components/admin-ui'
 import { getBanners, setBanners, BannerItem } from '@/lib/banners'
+import { WK_DEFAULT_CATEGORY_NAMES } from '@/lib/wala-kelma-content'
+import { readXlsxRows } from '@/lib/xlsx'
 import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/itsadmin1/business-tabs'
 import { Logo } from '@/components/logo'
 import { onAuthChange, signIn, signOutUser, getUserProfile, authErrorMessage } from '@/lib/auth'
 import { GradientBlobs } from '@/components/shared'
-import { Ban, ArrowLeft, Drama, Upload, Link2, Eye, EyeOff, ClipboardList, X, Clapperboard, FileText } from 'lucide-react'
+import { Ban, ArrowLeft, Drama, Upload, Link2, Eye, EyeOff, ClipboardList, X, Clapperboard, FileText, FileSpreadsheet } from 'lucide-react'
 
 type GateState = 'checking' | 'signedOut' | 'denied' | 'granted'
 
@@ -91,7 +93,7 @@ export default function AdminPage() {
 
         <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 16, padding: 6, border: `1px solid ${C.ink}12`, boxShadow: `0 8px 22px ${C.ink}0a`, marginBottom: 16, flexWrap: 'wrap' }}>
           {([
-            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['banners', 'البنر'], ['import', 'استيراد CSV'], ['scrape', 'سحب أعمال'],
+            ['dashboard', 'نظرة عامة'], ['works', 'الأعمال'], ['categories', 'الفئات'], ['banners', 'البنر'], ['import', 'استيراد Excel'], ['scrape', 'سحب أعمال'],
             ['orders', 'الطلبات'], ['users', 'المستخدمون'], ['packages', 'الباقات'], ['coupons', 'الكوبونات'], ['settings', 'الإعدادات'],
           ] as const).map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)} style={{
@@ -136,6 +138,16 @@ function CategoriesTab() {
     catch (e) { setErr('فشل الزرع: ' + (e as Error).message) }
     setBusy(false)
   }
+  // فئات افتراضية انضافت بعد ما الأدمن زرع فئاته (مثل قصائد وكتب) — نعرض زر يضيف الناقص بضغطة
+  const missingDefaults = WK_DEFAULT_CATEGORY_NAMES.filter(n => !cats.some(c => c.name.trim() === n))
+  const addMissing = async () => {
+    setBusy(true); setErr('')
+    try {
+      for (const [i, n] of missingDefaults.entries()) await addCategory(n, cats.length + i)
+      await reload()
+    } catch (e) { setErr('فشل الإضافة: ' + (e as Error).message) }
+    setBusy(false)
+  }
   const add = async () => {
     if (!name.trim()) return
     setBusy(true); setErr('')
@@ -170,6 +182,12 @@ function CategoriesTab() {
       {err && <Card><p style={{ color: C.red, fontWeight: 700, fontSize: 13 }}>{err}</p></Card>}
       {cats.length === 0 && (
         <Card><Muted>ما فيه فئات بعد.</Muted><button onClick={seed} disabled={busy} style={{ ...primaryBtn, marginTop: 10 }}>زرع الفئات الثماني الافتراضية</button></Card>
+      )}
+      {cats.length > 0 && missingDefaults.length > 0 && (
+        <Card>
+          <Muted>فئات جديدة متاحة: {missingDefaults.join('، ')}</Muted>
+          <button onClick={addMissing} disabled={busy} style={{ ...primaryBtn, marginTop: 10 }}>أضفها</button>
+        </Card>
       )}
       <Card>
         <SectionTitle>إضافة فئة</SectionTitle>
@@ -550,11 +568,25 @@ function ImportTab() {
     return rows
   }
 
+  // ملف Excel يتحوّل لنص CSV بالمربع — المشرف يراجعه قبل ما يضغط "استيراد" (نفس مسار CSV بالضبط)
+  const loadExcel = async (file: File) => {
+    setLog('')
+    try {
+      const rows = await readXlsxRows(file)
+      const esc = (c: string) => /[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c
+      setText(rows.map(r => r.map(esc).join(',')).join('\n'))
+      setLog(`تم تحميل ${Math.max(0, rows.length - 1)} صف من الإكسل — راجعها واضغط "استيراد"`)
+    } catch (e) {
+      setLog('تعذّر قراءة ملف الإكسل: ' + (e as Error).message)
+    }
+  }
+
   const run = async () => {
     setBusy(true); setLog('')
     const rows = parseCSV(text)
     if (rows.length < 2) { setLog('لا توجد بيانات — أضف صف عناوين وصفوف بيانات'); setBusy(false); return }
-    const header = rows[0].map(h => h.toLowerCase())
+    // قالب الإكسل يعلّم الأعمدة الإلزامية بـ "*" (مثلاً "العنوان *") — نشيلها قبل المطابقة
+    const header = rows[0].map(h => h.replace(/\*/g, '').trim().toLowerCase())
     const idx = (names: string[]) => header.findIndex(h => names.includes(h))
     const iTitle = idx(['title', 'العنوان', 'الاسم'])
     const iCat = idx(['category', 'categoryid', 'الفئة'])
@@ -569,7 +601,9 @@ function ImportTab() {
     const catByName = new Map(cats.map(c => [c.name.trim(), c.id]))
     const catById = new Set(cats.map(c => c.id))
     let ok = 0, fail = 0
-    for (const row of rows.slice(1)) {
+    // القالب فيه صف عناوين ثاني بالإنجليزي (title, category...) تحت العربي — ما نحسبه عمل
+    const dataRows = rows.slice(1).filter(r => !['title', 'العنوان', 'الاسم'].includes((r[iTitle] || '').trim().toLowerCase()))
+    for (const row of dataRows) {
       const title = row[iTitle]?.trim()
       const catRaw = row[iCat]?.trim()
       if (!title || !catRaw) { fail++; continue }
@@ -599,10 +633,11 @@ function ImportTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Card>
-        <SectionTitle>استيراد أعمال دفعة واحدة (CSV)</SectionTitle>
+        <SectionTitle>استيراد أعمال دفعة واحدة (Excel أو CSV)</SectionTitle>
         <Muted>الأعمدة: title و category (اسم الفئة كما هو مسجّل، أو معرّفها) إلزامية. الباقي اختياري: poster, year, country, actors (افصل بـ ؛), info, difficulty.</Muted>
         <textarea value={text} onChange={e => setText(e.target.value)} placeholder={template} style={{ ...input, minHeight: 160, resize: 'vertical', fontFamily: 'monospace', direction: 'ltr', textAlign: 'left' }} />
         <div style={{ display: 'flex', gap: 8 }}>
+          <label style={{ ...ghostBtn, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><FileSpreadsheet size={14} /> ملف Excel<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style={{ display: 'none' }} onChange={e => { const file = e.target.files?.[0]; if (file) loadExcel(file); e.target.value = '' }} /></label>
           <label style={{ ...ghostBtn, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><FileText size={14} /> ملف CSV<input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={async e => { const file = e.target.files?.[0]; if (file) setText(await file.text()) }} /></label>
           <button onClick={() => setText(template)} style={ghostBtn}>قالب</button>
           <button onClick={run} disabled={busy} style={{ ...primaryBtn, flex: 1 }}>{busy ? 'جاري الاستيراد…' : 'استيراد'}</button>

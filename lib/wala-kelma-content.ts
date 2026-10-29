@@ -49,7 +49,7 @@ export const WK_POWERUPS: PowerUpDef[] = [
 export type JokerOutcome = 'addPoint' | 'redoWithNewWork' | 'deductPoint'
 export const WK_JOKER_OUTCOMES: { id: JokerOutcome; label: string; emoji: string }[] = [
   { id: 'addPoint',        label: 'إضافة نقطة لفريقك',           emoji: '➕' },
-  { id: 'redoWithNewWork', label: 'إعادة التمثيل مع عمل جديد',   emoji: '🔁' },
+  { id: 'redoWithNewWork', label: 'إعادة — بدون نقطة',           emoji: '🔁' },
   { id: 'deductPoint',     label: 'خصم نقطة من فريقك',           emoji: '➖' },
 ]
 
@@ -66,6 +66,8 @@ export const WK_DEFAULT_CATEGORY_NAMES = [
   'مسلسلات خليجية',
   'مسرحيات',
   'أمثال شعبية',
+  'قصائد',
+  'كتب',
 ] as const
 
 // نوع العمل المشتق من اسم الفئة — يُعرض بكرت العمل بدل نبذة تفصيلية
@@ -74,5 +76,7 @@ export function typeLabelForCategory(categoryName: string): string {
   if (categoryName.includes('مسلسلات')) return 'مسلسل'
   if (categoryName.includes('مسرحيات')) return 'مسرحية'
   if (categoryName.includes('أمثال')) return 'مثل شعبي'
+  if (categoryName.includes('قصائد') || categoryName.includes('قصيدة')) return 'قصيدة'
+  if (categoryName.includes('كتب') || categoryName.includes('كتاب')) return 'كتاب'
   return categoryName
 }

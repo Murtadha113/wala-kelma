@@ -223,7 +223,7 @@ function DisplayInner() {
           <Users size={16} />
         </button>
       </div>
-      {showTeams && <TeamsRosterModal room={room} onClose={() => setShowTeams(false)} />}
+      {(showTeams || room.teamsPopup) && <TeamsRosterModal room={room} size="lg" onClose={() => setShowTeams(false)} />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Logo height={30} />
         <div style={{ textAlign: 'center' }}>
@@ -264,12 +264,6 @@ function DisplayInner() {
           </div>
         )}
 
-        {room.joker && (room.phase === 'acting' || room.phase === 'reading') && (
-          <div style={{ fontSize: 'clamp(13px, 1.8vw, 22px)', fontWeight: 800, color: C.orange, background: `${C.orange}14`, padding: '6px 14px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Dices size={16} /> الجوكر: {room.joker.outcome === 'addPoint' ? 'إضافة نقطة' : room.joker.outcome === 'deductPoint' ? 'خصم نقطة' : 'إعادة تمثيل بعمل جديد'}
-          </div>
-        )}
-
         {timed && <TimerRing timeLeft={timeLeft} total={phaseTotal(room)} danger={room.phase === 'stealing'} />}
 
         {room.phase === 'resolved' && room.lastResult && (
@@ -282,7 +276,7 @@ function DisplayInner() {
               {room.lastResult.type === 'joker' && (
                 room.lastResult.points > 0 ? `🎲 الجوكر: نقطة إضافية لـ ${room.teams[room.lastResult.team as TeamId].name}`
                 : room.lastResult.points < 0 ? `🎲 الجوكر: خصم نقطة من ${room.teams[room.lastResult.team as TeamId].name}`
-                : '🎲 الجوكر: إعادة — بدون نقطة')}
+                : '🎲 الجوكر: إعادة — بدون نقطة، الدور انتهى')}
             </div>
             {room.currentWork && (
               <div className="wk-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(18px, 2.6vw, 34px)', background: '#fff', borderRadius: 26, padding: 'clamp(18px, 2.4vw, 30px)', border: `1px solid ${C.ink}12`, boxShadow: `0 14px 34px ${C.ink}14`, maxWidth: 780 }}>
