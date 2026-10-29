@@ -85,6 +85,15 @@ export async function addWork(data: NewWork): Promise<string> {
   return ref.id
 }
 
+// سبب فشل الحفظ بكلام واضح للأدمن — قبل كانت الأخطاء تنبلع وما يبين إلا إن العمل ما انضاف
+export function saveErrorMessage(e: unknown): string {
+  const code = (e as { code?: string })?.code || ''
+  if (code.includes('permission-denied')) return 'ما عندك صلاحية — الحساب لازم يكون عليه isAdmin، أو قواعد Firestore ترفض الكتابة'
+  if (code.includes('resource-exhausted')) return 'خلص الحد المجاني اليومي لقاعدة البيانات (Firestore) — يرجع يشتغل الساعة 11 الصبح بتوقيت البحرين، أو حوّل المشروع لخطة Blaze'
+  if (code.includes('unavailable')) return 'ما في اتصال بقاعدة البيانات — تأكد من النت'
+  return (e as Error)?.message || String(e)
+}
+
 export async function updateWork(id: string, data: Partial<WalaKelmaWork>): Promise<void> {
   const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
   await updateDoc(doc(db, WORKS, id), clean as Record<string, never>)

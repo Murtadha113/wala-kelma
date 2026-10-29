@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { uploadImage } from '@/lib/storage'
 import {
   getCategories, addCategory, updateCategory, deleteCategory, seedDefaultCategories,
-  getAllWorks, addWork, updateWork, deleteWork, normalizeTitle, findDuplicateWorks,
+  getAllWorks, addWork, updateWork, deleteWork, normalizeTitle, findDuplicateWorks, saveErrorMessage,
   WKCategory, WalaKelmaWork, NewWork, Difficulty,
 } from '@/lib/works'
 import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/components/admin-ui'
@@ -338,6 +338,7 @@ function WorksTab() {
     setQuickBusy(true)
     setQuickProgress(0)
     let ok = 0
+    let firstErr = ''
     for (const it of quickItems) {
       try {
         const posterUrl = await uploadImage(it.file, 'works')
@@ -347,10 +348,10 @@ function WorksTab() {
           extraInfo: it.description.trim(), difficulty: 'medium', isActive: true,
         })
         ok++
-      } catch { /* تجاهل الفشل واستمر بالباقي */ }
+      } catch (e) { firstErr ||= saveErrorMessage(e) }   // نكمل بالباقي، بس نعرض السبب
       setQuickProgress(p => p + 1)
     }
-    setQuickLog(`تمت إضافة ${ok} من ${quickItems.length}.`)
+    setQuickLog(`تمت إضافة ${ok} من ${quickItems.length}.${firstErr ? ` السبب: ${firstErr}` : ''}`)
     quickItems.forEach(it => URL.revokeObjectURL(it.preview))
     setQuickItems([])
     setQuickBusy(false)
@@ -490,8 +491,12 @@ function WorkForm({ cats, works, initial, onClose, onSaved }: { cats: WKCategory
     if (dup && !confirm(`فيه عمل بنفس الاسم موجود مسبقاً: "${dup.title}" (${cats.find(c => c.id === dup.categoryId)?.name || '—'}). تبي تكمل الحفظ؟`)) return
     setBusy(true)
     const data: NewWork = { ...f, actors: actorsStr.split(/[،,]/).map(s => s.trim()).filter(Boolean) }
-    if (initial) await updateWork(initial.id, data)
-    else await addWork(data)
+    try {
+      if (initial) await updateWork(initial.id, data)
+      else await addWork(data)
+    } catch (e) {
+      setBusy(false); alert('ما انحفظ العمل: ' + saveErrorMessage(e)); return
+    }
     setBusy(false); onSaved()
   }
 
@@ -600,7 +605,7 @@ function ImportTab() {
 
     const catByName = new Map(cats.map(c => [c.name.trim(), c.id]))
     const catById = new Set(cats.map(c => c.id))
-    let ok = 0, fail = 0
+    let ok = 0, fail = 0, firstErr = ''
     // القالب فيه صف عناوين ثاني بالإنجليزي (title, category...) تحت العربي — ما نحسبه عمل
     const dataRows = rows.slice(1).filter(r => !['title', 'العنوان', 'الاسم'].includes((r[iTitle] || '').trim().toLowerCase()))
     for (const row of dataRows) {
@@ -622,9 +627,9 @@ function ImportTab() {
           difficulty, isActive: true,
         })
         ok++
-      } catch { fail++ }
+      } catch (e) { fail++; firstErr ||= saveErrorMessage(e) }
     }
-    setLog(`تم استيراد ${ok} عمل${fail ? ` — فشل ${fail}` : ''}.`)
+    setLog(`تم استيراد ${ok} عمل${fail ? ` — فشل ${fail}` : ''}.${firstErr ? ` السبب: ${firstErr}` : ''}`)
     setBusy(false)
   }
 
@@ -810,6 +815,7 @@ function ScrapeTab() {
     if (targets.length === 0) return
     setImporting(true); setImportDone(0)
     let ok = 0
+    let firstErr = ''
     for (const it of targets) {
       try {
         await addWork({
@@ -817,10 +823,10 @@ function ScrapeTab() {
           year: null, country: null, actors: [], extraInfo: '', difficulty: 'medium', isActive: true,
         })
         ok++
-      } catch { /* تجاهل الفشل واستمر بالباقي */ }
+      } catch (e) { firstErr ||= saveErrorMessage(e) }
       setImportDone(d => d + 1)
     }
-    setLog(`تمت إضافة ${ok} من ${targets.length} للفئة "${cats.find(c => c.id === categoryId)?.name || ''}".`)
+    setLog(`تمت إضافة ${ok} من ${targets.length} للفئة "${cats.find(c => c.id === categoryId)?.name || ''}".${firstErr ? ` السبب: ${firstErr}` : ''}`)
     setItems(prev => prev.filter(it => !it.selected))
     setImporting(false)
   }
