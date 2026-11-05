@@ -1,6 +1,6 @@
 // محرّك "ولا كلمة" — Realtime Database على المسار: wala_kelma_rooms/{code}
 // شاشتان: المقدم (يكتب) + العرض (قراءة فقط). المؤقّت مشتق من phaseEndsAt (timestamp).
-import { ref, set, get, onValue, off, update, remove } from 'firebase/database'
+import { ref, set, get, onValue, off, update, remove, increment as rtdbIncrement } from 'firebase/database'
 import { doc, writeBatch, increment, addDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore'
 import { rtdb, db, serverNow } from './firebase'
 import { generateCode } from './code'
@@ -15,6 +15,15 @@ import {
 } from './wala-kelma-content'
 
 const ROOMS = 'wala_kelma_rooms'
+// عدّاد لعب عام لكل عمل (عبر كل المضيفين) — سجل "شافها" خاص بكل حساب وما يقدر الأدمن يقراه،
+// فهذا اللي يغذّي إحصائيات الفئات بلوحة الإدارة (كم انلعب منها، وكم تتكرر أعمالها)
+export const WORK_STATS = 'wala_kelma_stats/works'
+export interface WorkPlayStat { plays: number; categoryId: string }
+
+export async function getWorkPlayStats(): Promise<Record<string, WorkPlayStat>> {
+  const snap = await get(ref(rtdb, WORK_STATS))
+  return snap.exists() ? snap.val() : {}
+}
 
 export type TeamId = 'A' | 'B'
 export interface WKPlayer { id: string; name: string }
@@ -459,6 +468,11 @@ export async function startTurn(code: string, uid: string, categoryId?: string):
     return { success: false, error: 'خلصت كل الأعمال بالفئات المختارة — جرّبوا تختارون فئة ثانية بمباراة جديدة، أو أنهوا المباراة الحين' }
   }
   const { current, exhausted, type } = picked
+  if (current.categoryId !== CUSTOM_CATEGORY_ID) {
+    // بالخلفية — فشل الإحصائية ما يوقف الدور
+    update(ref(rtdb, `${WORK_STATS}/${current.workId}`), { plays: rtdbIncrement(1), categoryId: current.categoryId })
+      .catch(e => console.warn('work stats:', e))
+  }
   const newStreak = type === room.lastPickedType ? (room.pickedTypeStreak ?? 0) + 1 : 1
 
   const readSeconds = room.mode === 'quick' ? WK_QUICK_READ_SECONDS : WK_READ_SECONDS

@@ -6,6 +6,15 @@
         ".write": "auth != null"
       }
     },
+    "wala_kelma_stats": {
+      ".read": "auth != null",
+      "works": {
+        "$workId": {
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['plays', 'categoryId']) && newData.child('plays').isNumber()"
+        }
+      }
+    },
     ".read": false,
     ".write": false
   }

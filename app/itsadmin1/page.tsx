@@ -11,6 +11,7 @@ import { C, Card, SectionTitle, Muted, input, primaryBtn, ghostBtn } from '@/com
 import { getBanners, setBanners, BannerItem } from '@/lib/banners'
 import { WK_DEFAULT_CATEGORY_NAMES } from '@/lib/wala-kelma-content'
 import { readXlsxRows } from '@/lib/xlsx'
+import { getWorkPlayStats } from '@/lib/wala-kelma'
 import { DashboardTab, OrdersTab, UsersTab, PackagesAdminTab, CouponsTab, SettingsTab } from '@/app/itsadmin1/business-tabs'
 import { Logo } from '@/components/logo'
 import { onAuthChange, signIn, signOutUser, getUserProfile, authErrorMessage } from '@/lib/auth'
@@ -121,6 +122,37 @@ export default function AdminPage() {
 }
 
 // ═══════════════ CATEGORIES ═══════════════
+// إحصائيات لعب الفئة من عدّاد اللعب العام — "انلعب" = كم عمل من الفئة انلعب ولو مرة،
+// و"تكرار" = متوسط مرات لعب كل عمل (فوق ×1 يعني أعمالها تتكرر على الناس وتحتاج أعمال جديدة)
+interface CategoryPlayStats { total: number; playedWorks: number; plays: number; share: number }
+
+async function loadCategoryPlayStats(): Promise<Record<string, CategoryPlayStats>> {
+  const [works, playStats] = await Promise.all([getAllWorks(), getWorkPlayStats()])
+  const out: Record<string, CategoryPlayStats> = {}
+  for (const w of works) {
+    if (!w.isActive) continue
+    const st = (out[w.categoryId] ||= { total: 0, playedWorks: 0, plays: 0, share: 0 })
+    const plays = playStats[w.id]?.plays || 0
+    st.total++
+    st.plays += plays
+    if (plays > 0) st.playedWorks++
+  }
+  const allPlays = Object.values(out).reduce((n, s) => n + s.plays, 0)
+  for (const s of Object.values(out)) s.share = allPlays ? Math.round((s.plays / allPlays) * 100) : 0
+  return out
+}
+
+function PlayBadge({ s }: { s?: CategoryPlayStats }) {
+  if (!s || s.total === 0) return null
+  const pct = Math.round((s.playedWorks / s.total) * 100)
+  const color = pct >= 90 ? C.red : pct >= 60 ? C.orange : '#27AE78'
+  return (
+    <span title={`انلعب ${s.playedWorks} من ${s.total} عمل`} style={{ position: 'absolute', top: 8, left: 10, padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 900, color: '#fff', background: color, whiteSpace: 'nowrap' }}>
+      انلعب {pct}%
+    </span>
+  )
+}
+
 function CategoriesTab() {
   const [cats, setCats] = useState<WKCategory[]>([])
   const [name, setName] = useState('')
@@ -129,8 +161,10 @@ function CategoriesTab() {
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [urlEditId, setUrlEditId] = useState<string | null>(null)
   const [urlValue, setUrlValue] = useState('')
+  const [stats, setStats] = useState<Record<string, CategoryPlayStats>>({})
   const reload = () => getCategories().then(setCats)
   useEffect(() => { reload() }, [])
+  useEffect(() => { loadCategoryPlayStats().then(setStats).catch(e => console.warn('category stats:', e)) }, [])
 
   const seed = async () => {
     setBusy(true); setErr('')
@@ -197,12 +231,21 @@ function CategoriesTab() {
         </div>
       </Card>
       {cats.map(c => (
-        <Card key={c.id}>
+        <Card key={c.id} style={{ position: 'relative', paddingTop: 30 }}>
+          <PlayBadge s={stats[c.id]} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {c.imageUrl
               ? <img src={c.imageUrl} alt={c.name} width={44} height={44} style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
               : <div style={{ width: 44, height: 44, borderRadius: 10, background: `${C.ink}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Drama size={18} color={`${C.ink}66`} /></div>}
-            <span style={{ flex: 1, fontWeight: 800 }}>{c.name}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800 }}>{c.name}</div>
+              {stats[c.id] && (
+                <div style={{ fontSize: 11, color: `${C.ink}77`, fontWeight: 700, marginTop: 2 }}>
+                  {stats[c.id].total} عمل · {stats[c.id].plays} مرة لعب · {stats[c.id].share}% من كل اللعب
+                  {stats[c.id].total > 0 && stats[c.id].plays > stats[c.id].total && ` · تكرار ×${(stats[c.id].plays / stats[c.id].total).toFixed(1)}`}
+                </div>
+              )}
+            </div>
             <label style={{ ...ghostBtn, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
               {uploadingId === c.id ? '…' : c.imageUrl ? 'تغيير' : <><Upload size={13} /> صورة</>}
               <input type="file" accept="image/*" style={{ display: 'none' }}
